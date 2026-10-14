@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, vet, test, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+  contract:
+    name: Contract test (optional, needs secrets)
+    runs-on: ubuntu-latest
+    # Runs only when the live-instance secrets are configured.
+    if: ${{ vars.CORVO_BASE_URL != '' }}
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+
+      - name: Contract test against live instance
+        env:
+          CORVO_API_KEY: ${{ secrets.CORVO_API_KEY }}
+          CORVO_BASE_URL: ${{ vars.CORVO_BASE_URL }}
+        run: go test ./test/contract/...

@@ -1,0 +1,27 @@
+# Binaries and build output
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Coverage
+coverage.out
+coverage.html
+*.coverprofile
+
+# Dependency / workspace files (the SDK has zero deps, but be safe)
+vendor/
+go.work
+go.work.sum
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
