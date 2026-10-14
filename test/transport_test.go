@@ -191,7 +191,7 @@ func TestTransportRetryAfterFromHeader(t *testing.T) {
 		writeJSON(w, http.StatusTooManyRequests, `{"code":"ERROR_RATE_LIMITED","message":"Rate limited"}`)
 	}))
 
-	_, err := client.Companies.List(context.Background(), nil)
+	_, _, err := client.Companies.List(context.Background(), nil)
 	failure := requireError(t, err)
 	if failure.Status != http.StatusTooManyRequests {
 		t.Errorf("expected status 429, got %d", failure.Status)
@@ -207,7 +207,7 @@ func TestTransportRetryAfterFromBodyWins(t *testing.T) {
 		writeJSON(w, http.StatusTooManyRequests, `{"code":"ERROR_RATE_LIMITED","message":"Rate limited","retryAfter":30}`)
 	}))
 
-	_, err := client.Companies.List(context.Background(), nil)
+	_, _, err := client.Companies.List(context.Background(), nil)
 	failure := requireError(t, err)
 	if failure.RetryAfter != 30 {
 		t.Errorf("expected retryAfter 30 from body, got %d", failure.RetryAfter)
@@ -314,18 +314,18 @@ func TestCertificatesUploadSendsMultipart(t *testing.T) {
 	if call.path != "/v1/companies/cmp_1/certificates" {
 		t.Errorf("expected multipart upload path, got %s", call.path)
 	}
-	mediaType, params, err := mime.ParseMediaType(rawContentType)
-	if err != nil || mediaType != "multipart/form-data" {
-		t.Fatalf("expected multipart/form-data content type, got %q (%v)", rawContentType, err)
+	mediaType, params, parseErr := mime.ParseMediaType(rawContentType)
+	if parseErr != nil || mediaType != "multipart/form-data" {
+		t.Fatalf("expected multipart/form-data content type, got %q (%v)", rawContentType, parseErr)
 	}
 	if params["boundary"] == "" {
 		t.Fatal("expected a multipart boundary in the content type")
 	}
 
 	reader := multipart.NewReader(strings.NewReader(call.body), params["boundary"])
-	filePart, err := reader.NextPart()
-	if err != nil {
-		t.Fatalf("expected file part: %v", err)
+	filePart, partErr := reader.NextPart()
+	if partErr != nil {
+		t.Fatalf("expected file part: %v", partErr)
 	}
 	if filePart.FormName() != "file" || filePart.FileName() != "certificado.p12" {
 		t.Errorf("expected file part named file/certificado.p12, got %q/%q", filePart.FormName(), filePart.FileName())
@@ -337,9 +337,9 @@ func TestCertificatesUploadSendsMultipart(t *testing.T) {
 	if string(fileBytes) != "PKCS12-BYTES" {
 		t.Errorf("expected PKCS12 bytes, got %q", fileBytes)
 	}
-	passwordPart, err := reader.NextPart()
-	if err != nil {
-		t.Fatalf("expected password part: %v", err)
+	passwordPart, partErr := reader.NextPart()
+	if partErr != nil {
+		t.Fatalf("expected password part: %v", partErr)
 	}
 	if passwordPart.FormName() != "password" {
 		t.Errorf("expected password field, got %q", passwordPart.FormName())
