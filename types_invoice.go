@@ -18,11 +18,11 @@ const (
 type InvoiceStage string
 
 const (
-	InvoiceStagePending          InvoiceStage = "pending"
-	InvoiceStageAuthorized       InvoiceStage = "authorized"
-	InvoiceStageDocumentsReady   InvoiceStage = "documents_ready"
-	InvoiceStageCompleted        InvoiceStage = "completed"
-	InvoiceStageFailed           InvoiceStage = "failed"
+	InvoiceStagePending        InvoiceStage = "pending"
+	InvoiceStageAuthorized     InvoiceStage = "authorized"
+	InvoiceStageDocumentsReady InvoiceStage = "documents_ready"
+	InvoiceStageCompleted      InvoiceStage = "completed"
+	InvoiceStageFailed         InvoiceStage = "failed"
 )
 
 // DownloadFormat selects the binary format for Invoices.DownloadURL.
@@ -33,12 +33,14 @@ const (
 	FormatXML DownloadFormat = "xml"
 )
 
-// InvoiceCustomerInput is the customer (tomador) of an invoice.
+// InvoiceCustomerInput is the customer (tomador) of an invoice. When a
+// customer is sent, TaxID (CPF or CNPJ) is required; omit the customer for an
+// invoice without one.
 type InvoiceCustomerInput struct {
-	Name    string                    `json:"name"`
-	TaxID   string                    `json:"taxId"`
-	Email   string                    `json:"email,omitempty"`
-	Address *InvoiceCustomerAddress   `json:"address,omitempty"`
+	TaxID   string                  `json:"taxId"`
+	Name    string                  `json:"name,omitempty"`
+	Email   string                  `json:"email,omitempty"`
+	Address *InvoiceCustomerAddress `json:"address,omitempty"`
 }
 
 // InvoiceCustomerAddress is the optional customer address. All fields are
@@ -51,18 +53,30 @@ type InvoiceCustomerAddress struct {
 	Country string `json:"country,omitempty"`
 }
 
-// InvoiceServiceInput describes the serviced item (serviço) — Code is the
-// municipal service code (six digits).
+// InvoiceServiceInput describes the service. All fields are optional: Code
+// (the national service code, 6 digits) defaults to the company's and then to
+// 100901, MunicipalityCode (IBGE, 7 digits) to the company's city, and
+// Description to the name of the service code.
 type InvoiceServiceInput struct {
-	Code            string `json:"code"`
+	Code             string `json:"code,omitempty"`
 	MunicipalityCode string `json:"municipalityCode,omitempty"`
-	Description     string `json:"description,omitempty"`
+	Description      string `json:"description,omitempty"`
 }
 
+// InvoiceType selects immediate or scheduled issuance.
+type InvoiceType string
+
+const (
+	InvoiceTypeImmediate InvoiceType = "IMMEDIATE"
+	InvoiceTypeSchedule  InvoiceType = "SCHEDULE"
+)
+
 // InvoiceCreateOptions are the optional emission knobs accepted by
-// Invoices.Create.
+// Invoices.Create. Type SCHEDULE with a future CompetenceDate schedules the
+// issuance (up to 15 days ahead by default).
 type InvoiceCreateOptions struct {
 	Email *InvoiceEmailOption `json:"email,omitempty"`
+	Type  InvoiceType         `json:"type,omitempty"`
 }
 
 // InvoiceEmailOption controls whether the NFS-e e-mail is sent.
@@ -70,18 +84,25 @@ type InvoiceEmailOption struct {
 	Send *bool `json:"send,omitempty"`
 }
 
-// InvoiceCreateParams are the fields accepted by Invoices.Create.
+// InvoiceCreateParams are the fields accepted by Invoices.Create and
+// Invoices.Calculate. Identify the company by CompanyID or CompanyTaxID.
 type InvoiceCreateParams struct {
-	CompanyID      string                 `json:"companyId,omitempty"`
-	CompanyTaxID   string                 `json:"companyTaxId,omitempty"`
-	ExternalID     string                 `json:"externalId,omitempty"`
-	CorrelationID  string                 `json:"correlationId,omitempty"`
-	Customer       InvoiceCustomerInput   `json:"customer"`
-	Service        InvoiceServiceInput    `json:"service"`
-	Amount         float64                `json:"amount"`
-	CompetenceDate string                 `json:"competenceDate"`
-	Email          string                 `json:"email,omitempty"`
-	Options        *InvoiceCreateOptions  `json:"options,omitempty"`
+	CompanyID    string `json:"companyId,omitempty"`
+	CompanyTaxID string `json:"companyTaxId,omitempty"`
+	ExternalID   string `json:"externalId,omitempty"`
+	// Customer is optional: leave it nil for an invoice without a customer.
+	Customer *InvoiceCustomerInput `json:"customer,omitempty"`
+	Service  InvoiceServiceInput   `json:"service"`
+	// Amount in BRL, positive, up to 2 decimal places.
+	Amount float64 `json:"amount"`
+	// CompetenceDate is YYYY-MM-DD.
+	CompetenceDate string `json:"competenceDate"`
+	// Discount is the unconditional discount in BRL, from 0 up to Amount.
+	Discount *float64 `json:"discount,omitempty"`
+	// Email requests the e-mail notification (default false);
+	// Options.Email.Send wins when set.
+	Email   *bool                 `json:"email,omitempty"`
+	Options *InvoiceCreateOptions `json:"options,omitempty"`
 }
 
 // InvoiceListParams are the filters accepted by Invoices.List and
@@ -100,41 +121,44 @@ type InvoiceListParams struct {
 // value when null. TaxSnapshot holds provider-specific tax details as
 // returned by the API, unchanged.
 type Invoice struct {
-	ID                 string         `json:"id"`
-	CompanyID          string         `json:"companyId"`
-	TenantID           string         `json:"tenantId"`
-	Environment        Environment    `json:"environment"`
-	DocumentKeyVersion int            `json:"documentKeyVersion"`
-	EmailSnapshot      InvoiceEmailSnapshot `json:"emailSnapshot"`
-	ExternalID         string         `json:"externalId"`
-	IdempotencyKey     string         `json:"idempotencyKey"`
-	Status             InvoiceStatus  `json:"status"`
-	CustomerSnapshot   InvoiceCustomerSnapshot `json:"customerSnapshot"`
-	ServiceSnapshot    InvoiceServiceSnapshot  `json:"serviceSnapshot"`
-	TaxSnapshot        map[string]any `json:"taxSnapshot"`
-	Amount             float64        `json:"amount"`
-	Currency           string         `json:"currency"`
-	CompetenceDate     string         `json:"competenceDate"`
-	DPSID              string         `json:"dpsId"`
-	DPSSeries          string         `json:"dpsSeries"`
-	DPSNumber          int            `json:"dpsNumber"`
-	AccessKey          string         `json:"accessKey"`
-	NFSENumber         int            `json:"nfseNumber"`
-	FiscalProvider     string         `json:"fiscalProvider"`
-	FiscalSchemaVersion string        `json:"fiscalSchemaVersion"`
-	IssuedAt           string         `json:"issuedAt"`
-	AuthorizedAt       string         `json:"authorizedAt"`
-	LastErrorCode      string         `json:"lastErrorCode"`
-	LastErrorMessage   string         `json:"lastErrorMessage"`
-	LastErrorProvider  string         `json:"lastErrorProvider"`
-	DocumentsReadyAt   string         `json:"documentsReadyAt"`
-	LastEmailStatus    string         `json:"lastEmailStatus"`
-	LastEmailSentAt    string         `json:"lastEmailSentAt"`
-	CreatedAt          string         `json:"createdAt"`
-	UpdatedAt          string         `json:"updatedAt"`
-	DocumentsStatus    string         `json:"documentsStatus"`
-	EmailStatus        string         `json:"emailStatus"`
-	Stage              InvoiceStage   `json:"stage"`
+	ID                  string                  `json:"id"`
+	CompanyID           string                  `json:"companyId"`
+	TenantID            string                  `json:"tenantId"`
+	Environment         Environment             `json:"environment"`
+	DocumentKeyVersion  int                     `json:"documentKeyVersion"`
+	EmailSnapshot       InvoiceEmailSnapshot    `json:"emailSnapshot"`
+	ExternalID          string                  `json:"externalId"`
+	IdempotencyKey      string                  `json:"idempotencyKey"`
+	Status              InvoiceStatus           `json:"status"`
+	CustomerSnapshot    InvoiceCustomerSnapshot `json:"customerSnapshot"`
+	ServiceSnapshot     InvoiceServiceSnapshot  `json:"serviceSnapshot"`
+	TaxSnapshot         map[string]any          `json:"taxSnapshot"`
+	Amount              float64                 `json:"amount"`
+	Currency            string                  `json:"currency"`
+	CompetenceDate      string                  `json:"competenceDate"`
+	DPSID               string                  `json:"dpsId"`
+	DPSSeries           string                  `json:"dpsSeries"`
+	DPSNumber           int                     `json:"dpsNumber"`
+	AccessKey           string                  `json:"accessKey"`
+	NFSENumber          int                     `json:"nfseNumber"`
+	FiscalProvider      string                  `json:"fiscalProvider"`
+	FiscalSchemaVersion string                  `json:"fiscalSchemaVersion"`
+	IssuedAt            string                  `json:"issuedAt"`
+	AuthorizedAt        string                  `json:"authorizedAt"`
+	LastErrorCode       string                  `json:"lastErrorCode"`
+	LastErrorMessage    string                  `json:"lastErrorMessage"`
+	LastErrorProvider   string                  `json:"lastErrorProvider"`
+	DocumentsReadyAt    string                  `json:"documentsReadyAt"`
+	LastEmailStatus     string                  `json:"lastEmailStatus"`
+	LastEmailSentAt     string                  `json:"lastEmailSentAt"`
+	CreatedAt           string                  `json:"createdAt"`
+	UpdatedAt           string                  `json:"updatedAt"`
+	DocumentsStatus     string                  `json:"documentsStatus"`
+	EmailStatus         string                  `json:"emailStatus"`
+	Stage               InvoiceStage            `json:"stage"`
+	// ScheduledFor is when a scheduled invoice is released (ISO); empty for an
+	// immediate one.
+	ScheduledFor string `json:"scheduledFor"`
 }
 
 // InvoiceEmailSnapshot records the e-mail options in force for the invoice.
@@ -144,16 +168,16 @@ type InvoiceEmailSnapshot struct {
 
 // InvoiceCustomerSnapshot is the customer data frozen at emission time.
 type InvoiceCustomerSnapshot struct {
-	Name    string                    `json:"name"`
-	Email   string                    `json:"email"`
-	TaxID   string                    `json:"taxId"`
-	Address *InvoiceCustomerAddress   `json:"address"`
+	Name    string                  `json:"name"`
+	Email   string                  `json:"email"`
+	TaxID   string                  `json:"taxId"`
+	Address *InvoiceCustomerAddress `json:"address"`
 }
 
 // InvoiceServiceSnapshot is the serviced item frozen at emission time.
 type InvoiceServiceSnapshot struct {
-	Code            string `json:"code"`
-	Description     string `json:"description"`
+	Code             string `json:"code"`
+	Description      string `json:"description"`
 	MunicipalityCode string `json:"municipalityCode"`
 }
 
@@ -179,4 +203,64 @@ type InvoiceDownloadUrl struct {
 type InvoiceEmailResult struct {
 	EmailID string `json:"emailId"`
 	Status  string `json:"status"`
+}
+
+// CalculatedTaxAmount is one tax of a pre-emission estimate. Rate is empty on
+// IBSTotal, which sums the state and municipal IBS.
+type CalculatedTaxAmount struct {
+	Base   string `json:"base"`
+	Rate   string `json:"rate,omitempty"`
+	Amount string `json:"amount"`
+}
+
+// CalculatedWithholding is a withheld tax of a pre-emission estimate.
+type CalculatedWithholding struct {
+	Tax    string `json:"tax"`
+	Base   string `json:"base"`
+	Rate   string `json:"rate"`
+	Amount string `json:"amount"`
+}
+
+// CalculatedTaxes groups the taxes of a pre-emission estimate.
+type CalculatedTaxes struct {
+	ISS      *CalculatedTaxAmount `json:"iss,omitempty"`
+	CBS      *CalculatedTaxAmount `json:"cbs,omitempty"`
+	IBSState *CalculatedTaxAmount `json:"ibsState,omitempty"`
+	IBSCity  *CalculatedTaxAmount `json:"ibsCity,omitempty"`
+	IBSTotal *CalculatedTaxAmount `json:"ibsTotal,omitempty"`
+}
+
+// CalculationBlocking explains why an estimate is blocked.
+type CalculationBlocking struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Step    string `json:"step"`
+}
+
+// CalculationPendingField is a field missing for the estimate.
+type CalculationPendingField struct {
+	Field  string `json:"field"`
+	Reason string `json:"reason"`
+}
+
+// InvoiceCalculation is the pre-emission estimate returned by
+// Invoices.Calculate. Status is "ready" or "blocked": a fiscal gap is data, not
+// an error. Money values are decimal strings.
+type InvoiceCalculation struct {
+	PreEmission         bool                      `json:"preEmission"`
+	Status              string                    `json:"status"`
+	Disclaimer          string                    `json:"disclaimer"`
+	CompetenceDate      string                    `json:"competenceDate"`
+	TaxRegime           string                    `json:"taxRegime"`
+	Classification      map[string]any            `json:"classification"`
+	Applicability       map[string]any            `json:"applicability"`
+	Taxes               CalculatedTaxes           `json:"taxes"`
+	Withholdings        []CalculatedWithholding   `json:"withholdings"`
+	NetReceivableAmount string                    `json:"netReceivableAmount"`
+	CollectionWaived    bool                      `json:"collectionWaived"`
+	Calculation         map[string]any            `json:"calculation"`
+	Warnings            []map[string]any          `json:"warnings"`
+	PendingFields       []CalculationPendingField `json:"pendingFields"`
+	Blocking            *CalculationBlocking      `json:"blocking"`
+	Trace               []map[string]any          `json:"trace"`
 }

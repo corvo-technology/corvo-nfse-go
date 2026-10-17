@@ -5,7 +5,8 @@ package corvonfse
 type WebhookEvent string
 
 // WebhookEvents are the nine event types accepted when creating a
-// webhook.
+// webhook. The webhook.test event is only sent by Webhooks.Test and cannot be
+// subscribed.
 var WebhookEvents = [...]WebhookEvent{
 	"nfse.invoice.authorized",
 	"nfse.invoice.rejected",
@@ -15,7 +16,7 @@ var WebhookEvents = [...]WebhookEvent{
 	"nfse.invoice.documents_ready",
 	"nfse.invoice.email_sent",
 	"nfse.invoice.email_failed",
-	"webhook.test",
+	"nfse.invoice.fiscal_discrepancy",
 }
 
 // WebhookCreateParams are the fields accepted by Webhooks.Create.
@@ -60,22 +61,22 @@ type DeliveryListParams struct {
 
 // WebhookDelivery is one delivery attempt of a webhook event.
 type WebhookDelivery struct {
-	ID             string         `json:"id"`
-	TenantID       string         `json:"tenantId"`
-	WebhookConfigID string        `json:"webhookConfigId"`
-	EventType      string         `json:"eventType"`
-	Environment    Environment    `json:"environment"`
-	URL            string         `json:"url"`
-	Payload        map[string]any `json:"payload"`
-	StatusCode     int            `json:"statusCode"`
-	ResponseBody   any            `json:"responseBody"`
-	ErrorMessage   string         `json:"errorMessage"`
-	Status         string         `json:"status"`
-	DurationMS     int            `json:"durationMs"`
-	RetryCount     int            `json:"retryCount"`
-	NextRetryAt    string         `json:"nextRetryAt"`
-	LastError      string         `json:"lastError"`
-	CreatedAt      string         `json:"createdAt"`
+	ID              string         `json:"id"`
+	TenantID        string         `json:"tenantId"`
+	WebhookConfigID string         `json:"webhookConfigId"`
+	EventType       string         `json:"eventType"`
+	Environment     Environment    `json:"environment"`
+	URL             string         `json:"url"`
+	Payload         map[string]any `json:"payload"`
+	StatusCode      int            `json:"statusCode"`
+	ResponseBody    any            `json:"responseBody"`
+	ErrorMessage    string         `json:"errorMessage"`
+	Status          string         `json:"status"`
+	DurationMS      int            `json:"durationMs"`
+	RetryCount      int            `json:"retryCount"`
+	NextRetryAt     string         `json:"nextRetryAt"`
+	LastError       string         `json:"lastError"`
+	CreatedAt       string         `json:"createdAt"`
 }
 
 // WebhookDeliveryStats are the delivery counters for a time window.

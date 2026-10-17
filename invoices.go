@@ -29,45 +29,54 @@ func invoiceListQuery(params *InvoiceListParams) url.Values {
 // Create issues an invoice. Pass a non-empty idempotencyKey to safely
 // retry: the same key returns the first created invoice.
 //
-// POST /invoices — unwrap "data+props". Returns 202 while the invoice is
-// queued.
+// POST /invoices — unwrap "data". Returns 202 while the invoice is queued.
 func (i *Invoices) Create(ctx context.Context, params InvoiceCreateParams, idempotencyKey string) (Invoice, *CorvoError) {
 	return requestJSON[Invoice](ctx, i.t, requestSpec{
 		method:         http.MethodPost,
 		path:           "/invoices",
 		jsonBody:       params,
 		idempotencyKey: idempotencyKey,
-		unwrap:         UnwrapDataProps,
 	})
 }
 
-// Get reads an invoice by ID. GET /invoices/:id — unwrap "data+props".
+// Calculate estimates the taxes of an invoice without issuing, storing or
+// charging anything. A fiscal gap is not an error: the result comes back with
+// Status "blocked", Blocking and PendingFields set.
+// POST /invoices/calculate — unwrap "data".
+func (i *Invoices) Calculate(ctx context.Context, params InvoiceCreateParams) (InvoiceCalculation, *CorvoError) {
+	return requestJSON[InvoiceCalculation](ctx, i.t, requestSpec{
+		method:   http.MethodPost,
+		path:     "/invoices/calculate",
+		jsonBody: params,
+	})
+}
+
+// Get reads an invoice by ID. GET /invoices/:id — unwrap "data".
 func (i *Invoices) Get(ctx context.Context, id string) (Invoice, *CorvoError) {
 	return requestJSON[Invoice](ctx, i.t, requestSpec{
 		method: http.MethodGet,
 		path:   "/invoices/" + url.PathEscape(id),
-		unwrap: UnwrapDataProps,
 	})
 }
 
 // List returns one page of invoices plus its pagination.
-// GET /invoices — unwrap "none", items wrapped in { props }.
+// GET /invoices — unwrap "none".
 func (i *Invoices) List(ctx context.Context, params *InvoiceListParams) ([]Invoice, Pagination, *CorvoError) {
-	return requestPage[Invoice](ctx, i.t, "/invoices", invoiceListQuery(params), true)
+	return requestPage[Invoice](ctx, i.t, "/invoices", invoiceListQuery(params))
 }
 
 // Iterate walks every page of invoices matching params, calling fn per
 // item until it returns false or all pages are consumed. A page failure —
 // including the first — is returned as *CorvoError.
 func (i *Invoices) Iterate(ctx context.Context, params *InvoiceListParams, fn func(Invoice) bool) *CorvoError {
-	return iteratePages[Invoice](ctx, i.t, "/invoices", invoiceListQuery(params), true, fn)
+	return iteratePages[Invoice](ctx, i.t, "/invoices", invoiceListQuery(params), fn)
 }
 
 // Events returns one page of status transitions of an invoice.
-// GET /invoices/:id/events — unwrap "none", items wrapped in { props }.
+// GET /invoices/:id/events — unwrap "none".
 func (i *Invoices) Events(ctx context.Context, id string, params *ListParams) ([]InvoiceEvent, Pagination, *CorvoError) {
 	return requestPage[InvoiceEvent](ctx, i.t,
-		"/invoices/"+url.PathEscape(id)+"/events", listQuery(params), true)
+		"/invoices/"+url.PathEscape(id)+"/events", listQuery(params))
 }
 
 // PDF downloads the PDF representation of an authorized invoice.
@@ -87,8 +96,8 @@ func (i *Invoices) XML(ctx context.Context, id string) (DownloadedFile, *CorvoEr
 // POST /invoices/:id/download-url — unwrap "data".
 func (i *Invoices) DownloadURL(ctx context.Context, id string, format DownloadFormat) (InvoiceDownloadUrl, *CorvoError) {
 	return requestJSON[InvoiceDownloadUrl](ctx, i.t, requestSpec{
-		method:   http.MethodPost,
-		path:     "/invoices/" + url.PathEscape(id) + "/download-url",
+		method: http.MethodPost,
+		path:   "/invoices/" + url.PathEscape(id) + "/download-url",
 		jsonBody: struct {
 			Format DownloadFormat `json:"format"`
 		}{Format: format},
