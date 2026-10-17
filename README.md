@@ -1,21 +1,14 @@
 # corvo-nfse-go
 
-Idiomatic Go SDK for the **Corvo NFS-e API** — issue, track and serve Brazilian
-fiscal invoices (NFS-e) with cursor-paginated lists, webhook verification and
-typed errors.
+Go SDK for the **[Corvo](https://corvo.tech) NFS-e API**: register companies, calculate taxes, issue Brazilian service invoices (NFS-e), follow them by webhook and download the PDF and XML.
 
-- **Go 1.22+**, `net/http` only — **zero runtime dependencies**
-- 28 API operations + 2 health checks, mirroring the
-  [`corvo-nfse-node`](https://github.com/corvo-technology/corvo-nfse-node) contract
-- Result-style `(T, *CorvoError)` returns — never panics for API, network or
-  timeout failures
-- `X-API-Key` auth, `https://api.corvo.tech` default, `v1` prefix, self-hosted
-  friendly
-- HMAC-SHA256 webhook verification, constant-time
+- **Go 1.22+**, `net/http` only, **no dependencies**.
+- Every call returns `(T, *CorvoError)`: API, network and timeout failures are values, never panics. The error carries the server's `Code`, the HTTP `Status`, the `RequestID` and the field-level `Details`.
+- Cursor-paginated lists with an `Iterate` helper that walks every page.
+- Idempotency keys for issuing an invoice and sending an email.
+- HMAC-SHA256 webhook verification in constant time.
 
-```text
-github.com/corvo-technology/corvo-nfse-go   (import alias: corvonfse)
-```
+Full API reference: <https://corvo.tech/en/api-docs>.
 
 ## Install
 
@@ -23,7 +16,11 @@ github.com/corvo-technology/corvo-nfse-go   (import alias: corvonfse)
 go get github.com/corvo-technology/corvo-nfse-go
 ```
 
+The package name is `corvonfse`.
+
 ## Quickstart
+
+Start with a `corvo_test_...` key: invoices issued with it have no fiscal value.
 
 ```go
 package main
@@ -39,57 +36,68 @@ import (
 func main() {
 	// APIKey falls back to CORVO_API_KEY; BaseURL to CORVO_BASE_URL
 	// (default https://api.corvo.tech).
-	client := corvonfse.NewClient(corvonfse.Options{
-		APIKey: "corvo_live_...",
-	})
+	client := corvonfse.NewClient(corvonfse.Options{APIKey: "corvo_test_..."})
+	ctx := context.Background()
 
-	invoice, err := client.Invoices.Create(context.Background(), corvonfse.InvoiceCreateParams{
-		CompanyID: "09947127-2702-4f6d-9da8-cb463608d812",
-		Customer: corvonfse.InvoiceCustomerInput{
-			Name:  "Cliente Exemplo",
-			TaxID: "52998224725",
-		},
-		Service: corvonfse.InvoiceServiceInput{
-			Code:        "010101",
-			Description: "Software development",
-		},
-		Amount:         150.50,
-		CompetenceDate: "2026-10-12T00:00:00.000Z",
-	}, "") // pass an idempotency key to safely retry
+	companies, page, err := client.Companies.List(ctx, &corvonfse.ListParams{Limit: 10})
 	if err != nil {
-		log.Fatalf("create: %v", err) // ERROR_* codes, status, details, requestId
+		log.Fatalf("%s (HTTP %d, request %s)", err.Code, err.Status, err.RequestID)
 	}
-	fmt.Println(invoice.ID, invoice.Status)
+	fmt.Println(len(companies), page.HasMore)
 }
 ```
 
-### Resources
+`NewClient` is the only call that panics: it fails fast on a missing API key, an invalid base URL, or a plain `http://` URL on a public host.
 
-| Field | Operations |
-| --- | --- |
-| `client.Companies` | `Create`, `Get`, `Update`, `Remove`, `List`, `Iterate` |
-| `client.Certificates` | `Upload`, `List`, `Remove` |
-| `client.Invoices` | `Create`, `Get`, `List`, `Iterate`, `Events`, `PDF`, `XML`, `DownloadURL`, `SendEmail` |
-| `client.Webhooks` | `List`, `Create`, `Remove`, `Test` + `Deliveries.List/Iterate/Stats/Retry` |
-| `client.Credits` | `Balance`, `Plans`, `History`, `IterateHistory` |
-| `client.Billing` | `Plan`, `Usage` |
-| `client.Health` | `Live`, `Ready` |
+### Register a company
 
-Every method takes a `context.Context` first. Every API call returns
-`(T, *CorvoError)` — check `err != nil`, then read `Status`, `Code`,
-`Message`, `Details`, `RequestID` and `RetryAfter`.
+```go
+company, err := client.Companies.Create(ctx, corvonfse.CompanyCreateParams{
+	LegalName:          "Empresa Exemplo Ltda",
+	TaxID:              "11222333000181",
+	TaxRegime:          corvonfse.TaxRegimeSimplesNacional,
+	MunicipalityCode:   "3550308", // IBGE code, 7 digits
+	DefaultServiceCode: "010101",  // optional: used when an invoice omits service.code
+})
+```
+
+In `live`, also upload the A1 certificate. The company is ready when `company.Status` is `"ready"` and `company.SetupGaps` is empty.
+
+### Estimate the taxes before issuing
+
+Nothing is issued, stored or charged.
+
+```go
+estimate, err := client.Invoices.Calculate(ctx, corvonfse.InvoiceCreateParams{
+	CompanyTaxID:   "11222333000181",
+	Service:        corvonfse.InvoiceServiceInput{Description: "Consultoria"},
+	Amount:         1500,
+	CompetenceDate: "2026-10-16",
+})
+// estimate.Status is "ready" or "blocked": a fiscal gap is data, not an error.
+```
+
+### Issue an invoice
+
+Issuing is asynchronous: a successful call means the request was accepted, not that the invoice is authorized. Follow the status with `Invoices.Get` or webhooks.
+
+```go
+invoice, err := client.Invoices.Create(ctx, corvonfse.InvoiceCreateParams{
+	CompanyTaxID: "11222333000181", // or CompanyID
+	// Customer is optional: leave it nil for an invoice without one.
+	Customer:       &corvonfse.InvoiceCustomerInput{TaxID: "52998224725", Name: "Cliente", Email: "cliente@example.com"},
+	Service:        corvonfse.InvoiceServiceInput{Description: "Consultoria"}, // code and city default to the company's
+	Amount:         150.50,
+	CompetenceDate: "2026-10-16",
+}, "order-42") // idempotency key: the same key never issues twice
+```
+
+Set `Options: &corvonfse.InvoiceCreateOptions{Type: corvonfse.InvoiceTypeSchedule}` with a future `CompetenceDate` to schedule the issuance.
 
 ### Lists and iteration
 
-`List` returns the page items plus the pagination block; `Iterate` walks every
-page for you and surfaces a first-page failure as `*CorvoError`:
-
 ```go
 items, page, err := client.Companies.List(ctx, &corvonfse.ListParams{Limit: 100})
-if err != nil {
-	// handle
-}
-fmt.Println(len(items), page.HasMore, page.NextCursor)
 
 err = client.Invoices.Iterate(ctx, &corvonfse.InvoiceListParams{
 	Status: corvonfse.InvoiceStatusAuthorized,
@@ -99,80 +107,73 @@ err = client.Invoices.Iterate(ctx, &corvonfse.InvoiceListParams{
 })
 ```
 
-### Binary downloads
+### Download the PDF or XML
+
+The invoice must be `authorized` and have its documents ready.
 
 ```go
 pdf, err := client.Invoices.PDF(ctx, invoice.ID)
 if err == nil {
-	_ = os.WriteFile("nfse.pdf", pdf.Buffer, 0o644)
-	fmt.Println(pdf.MimeType, pdf.FileName) // from the response headers
+	_ = os.WriteFile("nfse.pdf", pdf.Buffer, 0o644) // also pdf.MimeType and pdf.FileName
 }
 ```
 
-### Webhook verification
+### Verify webhook signatures
 
 ```go
-body, _ := io.ReadAll(r.Body)
-if !corvonfse.VerifySignature(body, r.Header.Get("X-Corbo-Signature"), secret) {
+body, _ := io.ReadAll(r.Body) // the raw bytes: do not parse and re-serialize first
+if !corvonfse.VerifySignature(body, r.Header.Get("X-Corvo-Signature"), secret) {
 	http.Error(w, "invalid signature", http.StatusBadRequest)
 	return
 }
+// Deduplicate by event id: the same event can be delivered more than once.
 ```
 
-`VerifySignature` computes HMAC-SHA256 over the raw body and compares in
-constant time (`crypto/subtle`). Malformed headers, an empty secret or a
-mismatch return `false` — it never panics.
+`VerifySignature` never panics: a malformed header, an empty secret or a mismatch return `false`.
 
-### Configuration
+## Resources
+
+| Field | Operations |
+| --- | --- |
+| `client.Companies` | `Create`, `Get`, `Update`, `Remove`, `List`, `Iterate` |
+| `client.Certificates` | `Upload`, `List`, `Remove` |
+| `client.Invoices` | `Create`, `Calculate`, `Get`, `List`, `Iterate`, `Events`, `PDF`, `XML`, `DownloadURL`, `SendEmail` |
+| `client.Webhooks` | `List`, `Create`, `Remove`, `Test` + `Deliveries.List/Iterate/Stats/Retry` |
+| `client.Credits` | `Balance`, `Plans`, `History`, `IterateHistory` |
+| `client.Billing` | `Plan`, `Usage` |
+| `client.Plans` | `List`, `Get`, `Quote` (public price catalog) |
+| `client.Health` | `Live`, `Ready` |
+
+Changing plans and the billing portal exist only in the dashboard, so they are not in the SDK. Every method takes a `context.Context` first.
+
+## Configuration
 
 | Option | Env fallback | Default |
 | --- | --- | --- |
-| `APIKey` | `CORVO_API_KEY` | required (panic if missing) |
+| `APIKey` | `CORVO_API_KEY` | required |
 | `BaseURL` | `CORVO_BASE_URL` | `https://api.corvo.tech` |
-| `Prefix` | — | `v1` |
-| `Timeout` | — | 30s per request |
-| `AllowInsecureHTTP` | — | `false` (loopback/private hosts always allowed) |
-| `HTTPClient` | — | pooled `*http.Client` (SDK default) |
+| `Prefix` | none | `v1` |
+| `Timeout` | none | 30s per request |
+| `AllowInsecureHTTP` | none | `false` (loopback and private hosts are always allowed) |
+| `HTTPClient` | none | pooled `*http.Client` |
 
-`NewClient` panics only on misconfiguration — a missing API key, an invalid
-base URL, or plain `http://` against a public host — since those are programmer
-errors detected at startup. Runtime failures are always returned values.
+## Behavior
 
-The CLI, the official OpenAPI spec and Postman collection ship with the
-canonical [Node SDK](https://github.com/corvo-technology/corvo-nfse-node) and
-work with any of the SDKs; this package is the Go library.
-
-## The contract (in-depth)
-
-Nine SDKs, one behavior. This SDK implements the same analysis as every other Corvo SDK, mirrored from the canonical Node SDK.
-
-**Auth.** Every request carries `X-API-Key` (never `Authorization: Bearer`). Keys are scoped per tenant; the base URL defaults to `https://api.corvo.tech` and is overridable for self-hosted deployments. All routes live under the `v1` prefix.
-
-**Response envelope.** Endpoints return one of three shapes, and the SDK unwraps them idiomatically: `{ "data": ... }` (single resource), `{ "data": { "props": ... } }` (resource behind a `props` wrapper), or no envelope (health checks, raw downloads). List endpoints return `{ "data": [...], "pagination": { "limit", "hasMore", "nextCursor" } }`. A `204 No Content` maps to an empty result.
-
-**Errors never throw.** Network failures, timeouts, non-2xx responses, and malformed JSON all resolve to a typed error carrying `status`, `code`, `message`, `details`, `requestId`, and `retryAfter` — returned alongside (or as) the result, never raised. `code` falls back to `http_<status>` when the body doesn't carry one; transport-level failures use `network_error` / `timeout` / `invalid_json`. The only operation that raises is the `iterate` helper, and only on the first page's failure.
-
-**Pagination.** List endpoints are cursor-paginated. The SDK exposes both a `list` (single page) and an `iterate`/stream helper that walks `nextCursor` until `hasMore` is false.
-
-**Idempotency.** Invoice create and send-email accept an idempotency key, sent as the `Idempotency-Key` header so retries are safe.
-
-**Webhooks.** Deliveries are signed with HMAC-SHA256 over the raw body. The SDK exposes a timing-safe `verifySignature(rawBody, header, secret)`.
-
-**Surface.** Exactly 28 operations across companies, certificates, invoices, webhooks (incl. nested deliveries), credits, and billing — plus `health/live` and `health/ready`.
+- **Auth.** Every request sends `X-API-Key`. Keys are `corvo_test_...` or `corvo_live_...` and belong to one account and environment; the key decides the environment.
+- **Responses.** Single resources and list items come back as the API's `data`; lists add `pagination`. Optional fields that are absent map to their zero value.
+- **Errors.** Network failures, timeouts, non-2xx responses and malformed JSON all return a `*CorvoError`. `Code` is the API's `ERROR_*` code, falling back to `http_<status>`; transport failures use `network_error`, `timeout` and `invalid_json`. On `429`, `RetryAfter` holds the seconds to wait. `Iterate` reports a failed page the same way.
 
 ## Development
 
 ```sh
-go build ./...   # compile
-go vet ./...     # static analysis
-go test ./...    # unit + HMAC vector; contract test skips without env
+go build ./...
+go vet ./...
+go test ./...    # unit tests with httptest; the contract test skips without env
 golangci-lint run
 ```
 
-Tests live in `test/` and mock the API with `httptest` (no network). The
-contract test in `test/contract/` runs only when `CORVO_API_KEY` and
-`CORVO_BASE_URL` are set — that is how CI exercises a live instance.
+The contract test in `test/contract/` runs only when `CORVO_API_KEY` and `CORVO_BASE_URL` point to a reachable instance.
 
 ## License
 
-[MIT](LICENSE) © Corvo Technology 2026
+[MIT](LICENSE) © Corvo Technology

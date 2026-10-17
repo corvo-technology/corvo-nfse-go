@@ -44,7 +44,7 @@ type (
 // List returns one page of webhook configs.
 // GET /webhooks — unwrap "none".
 func (w *Webhooks) List(ctx context.Context, params *ListParams) ([]Webhook, Pagination, *CorvoError) {
-	return requestPage[Webhook](ctx, w.t, "/webhooks", listQuery(params), false)
+	return requestPage[Webhook](ctx, w.t, "/webhooks", listQuery(params))
 }
 
 // Create registers a webhook and returns its signing secret — the only
@@ -92,14 +92,14 @@ func deliveryListQuery(params *DeliveryListParams) url.Values {
 // List returns one page of deliveries, newest first.
 // GET /webhooks/deliveries — unwrap "none".
 func (d *Deliveries) List(ctx context.Context, params *DeliveryListParams) ([]WebhookDelivery, Pagination, *CorvoError) {
-	return requestPage[WebhookDelivery](ctx, d.t, "/webhooks/deliveries", deliveryListQuery(params), false)
+	return requestPage[WebhookDelivery](ctx, d.t, "/webhooks/deliveries", deliveryListQuery(params))
 }
 
 // Iterate walks every page of deliveries matching params, calling fn per
 // item until it returns false or all pages are consumed. A page failure —
 // including the first — is returned as *CorvoError.
 func (d *Deliveries) Iterate(ctx context.Context, params *DeliveryListParams, fn func(WebhookDelivery) bool) *CorvoError {
-	return iteratePages[WebhookDelivery](ctx, d.t, "/webhooks/deliveries", deliveryListQuery(params), false, fn)
+	return iteratePages[WebhookDelivery](ctx, d.t, "/webhooks/deliveries", deliveryListQuery(params), fn)
 }
 
 // Stats returns the delivery counters for the last hours in the given

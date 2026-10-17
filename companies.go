@@ -60,12 +60,12 @@ func (c *Companies) Remove(ctx context.Context, id string) *CorvoError {
 // List returns one page of companies plus its pagination.
 // GET /companies — unwrap "none".
 func (c *Companies) List(ctx context.Context, params *ListParams) ([]Company, Pagination, *CorvoError) {
-	return requestPage[Company](ctx, c.t, "/companies", listQuery(params), false)
+	return requestPage[Company](ctx, c.t, "/companies", listQuery(params))
 }
 
 // Iterate walks every page of companies, calling fn per item until it
 // returns false or all pages are consumed. A page failure — including the
 // first — is returned as *CorvoError.
 func (c *Companies) Iterate(ctx context.Context, params *ListParams, fn func(Company) bool) *CorvoError {
-	return iteratePages[Company](ctx, c.t, "/companies", listQuery(params), false, fn)
+	return iteratePages[Company](ctx, c.t, "/companies", listQuery(params), fn)
 }

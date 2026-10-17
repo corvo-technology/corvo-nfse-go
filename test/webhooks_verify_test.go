@@ -40,13 +40,13 @@ func TestVerifySignatureRejectsTampering(t *testing.T) {
 
 func TestVerifySignatureRejectsMalformedInput(t *testing.T) {
 	for name, header := range map[string]string{
-		"missing prefix":     strings.TrimPrefix(signedHeader, "sha256="),
-		"bad hex":            "sha256=zzzz",
-		"empty header":       "",
-		"uppercase hex":      "sha256=" + strings.ToUpper(signedHeader[len("sha256="):]),
-		"wrong length":       "sha256=abc",
-		"other algorithm":    "sha512=8f9bd040d8f717b19618ab3395ddfa4b8c176b8dc863195227b88dd85426bbbc",
-		"trailing garbage":   signedHeader + "!",
+		"missing prefix":   strings.TrimPrefix(signedHeader, "sha256="),
+		"bad hex":          "sha256=zzzz",
+		"empty header":     "",
+		"uppercase hex":    "sha256=" + strings.ToUpper(signedHeader[len("sha256="):]),
+		"wrong length":     "sha256=abc",
+		"other algorithm":  "sha512=8f9bd040d8f717b19618ab3395ddfa4b8c176b8dc863195227b88dd85426bbbc",
+		"trailing garbage": signedHeader + "!",
 	} {
 		if corvonfse.VerifySignature([]byte(signedBody), header, signedSecret) {
 			t.Errorf("%s: expected rejection of header %q", name, header)

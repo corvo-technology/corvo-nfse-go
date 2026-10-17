@@ -49,12 +49,12 @@ func TestTransportSendsJSONBodyAndIdempotencyKey(t *testing.T) {
 	var call capture
 	client, _ := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		call = record(r)
-		writeJSON(w, http.StatusAccepted, `{"data":{"props":{"id":"inv_1"}}}`)
+		writeJSON(w, http.StatusAccepted, `{"data":{"id":"inv_1"}}`)
 	}))
 
 	send := true
 	invoice, err := client.Invoices.Create(context.Background(), corvonfse.InvoiceCreateParams{
-		Customer: corvonfse.InvoiceCustomerInput{
+		Customer: &corvonfse.InvoiceCustomerInput{
 			Name:  "Cliente Fictício de Testes",
 			TaxID: "52998224725",
 		},
@@ -72,7 +72,7 @@ func TestTransportSendsJSONBodyAndIdempotencyKey(t *testing.T) {
 		t.Fatalf("invoices.create: %v", err)
 	}
 	if invoice.ID != "inv_1" {
-		t.Errorf("expected unwrapped props id inv_1, got %q", invoice.ID)
+		t.Errorf("expected unwrapped id inv_1, got %q", invoice.ID)
 	}
 	if call.header.Get("Content-Type") != "application/json" {
 		t.Errorf("expected Content-Type application/json, got %q", call.header.Get("Content-Type"))
@@ -108,7 +108,7 @@ func TestTransportUnwrapsData(t *testing.T) {
 
 func TestTransportUnwrapsDataProps(t *testing.T) {
 	client, _ := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, `{"data":{"props":{"id":"inv_1","nfseNumber":1001,"status":"authorized"}}}`)
+		writeJSON(w, http.StatusOK, `{"data":{"id":"inv_1","nfseNumber":1001,"status":"authorized"}}`)
 	}))
 
 	invoice, err := client.Invoices.Get(context.Background(), "inv_1")
@@ -116,7 +116,7 @@ func TestTransportUnwrapsDataProps(t *testing.T) {
 		t.Fatalf("invoices.get: %v", err)
 	}
 	if invoice.ID != "inv_1" || invoice.NFSENumber != 1001 || invoice.Status != corvonfse.InvoiceStatusAuthorized {
-		t.Errorf("expected unwrapped props, got %+v", invoice)
+		t.Errorf("expected unwrapped invoice, got %+v", invoice)
 	}
 }
 

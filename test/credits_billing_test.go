@@ -39,11 +39,11 @@ func TestCreditsPlansUnwrapsPropsItems(t *testing.T) {
 			t.Errorf("expected plans path, got %s", r.URL.Path)
 		}
 		writeJSON(w, http.StatusOK, `{
-			"data": [{"props": {
+			"data": [{
 				"id": "plan_1", "slug": "start", "name": "Start",
 				"dailyLimit": 300, "creditUnitPriceCents": 7,
 				"supportTier": "standard", "active": true
-			}}],
+			}],
 			"pagination": {"limit": 50, "hasMore": false, "nextCursor": null}
 		}`)
 	}))
@@ -63,13 +63,13 @@ func TestCreditsIterateHistoryWalksPropsPages(t *testing.T) {
 		page++
 		if page == 1 {
 			writeJSON(w, http.StatusOK, `{
-				"data": [{"props": {"id": "tx_1", "type": "consumption", "amount": 1, "balanceAfter": 199}}],
+				"data": [{"id": "tx_1", "type": "consumption", "amount": 1, "balanceAfter": 199}],
 				"pagination": {"limit": 1, "hasMore": true, "nextCursor": "h1"}
 			}`)
 			return
 		}
 		writeJSON(w, http.StatusOK, `{
-			"data": [{"props": {"id": "tx_2", "type": "consumption", "amount": 1, "balanceAfter": 198}}],
+			"data": [{"id": "tx_2", "type": "consumption", "amount": 1, "balanceAfter": 198}],
 			"pagination": {"limit": 1, "hasMore": false, "nextCursor": null}
 		}`)
 	}))

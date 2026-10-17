@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Version is the SDK version, synchronized across the Corvo SDK family.
-const Version = "0.1.0"
+// Version is the SDK version.
+const Version = "0.1.1"
 
 // Options configures NewClient.
 //
@@ -17,11 +17,10 @@ const Version = "0.1.0"
 type Options struct {
 	// APIKey is sent as the X-API-Key header. Falls back to CORVO_API_KEY.
 	APIKey string
-	// BaseURL of the API instance. Falls back to CORVO_BASE_URL, then to
+	// BaseURL of the API. Falls back to CORVO_BASE_URL, then to
 	// https://api.corvo.tech.
 	BaseURL string
-	// Prefix of the API routes (self-hosted instances with a custom
-	// API_PREFIX). Defaults to "v1".
+	// Prefix of the API routes. Defaults to "v1".
 	Prefix string
 	// Timeout for each request. Defaults to 30s; negative disables it.
 	// Ignored when HTTPClient is provided.
@@ -47,6 +46,7 @@ type Client struct {
 	Credits      *Credits
 	Health       *Health
 	Invoices     *Invoices
+	Plans        *Plans
 	Webhooks     *Webhooks
 }
 
@@ -94,6 +94,7 @@ func NewClient(opts Options) *Client {
 		Credits:      &Credits{t: transport},
 		Health:       &Health{t: transport},
 		Invoices:     &Invoices{t: transport},
+		Plans:        &Plans{t: transport},
 		Webhooks:     newWebhooks(transport),
 	}
 }

@@ -78,7 +78,7 @@ func writeMultipartFile(writer *multipart.Writer, header textproto.MIMEHeader, f
 // GET /companies/:companyId/certificates — unwrap "none".
 func (c *Certificates) List(ctx context.Context, companyID string, params *ListParams) ([]Certificate, Pagination, *CorvoError) {
 	return requestPage[Certificate](ctx, c.t,
-		"/companies/"+url.PathEscape(companyID)+"/certificates", listQuery(params), false)
+		"/companies/"+url.PathEscape(companyID)+"/certificates", listQuery(params))
 }
 
 // Remove deletes a certificate. 204 on success.

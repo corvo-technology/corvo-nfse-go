@@ -9,19 +9,19 @@ import (
 	"strings"
 )
 
-// signatureRE matches the X-Corbo-Signature header format: sha256=<hex>.
+// signatureRE matches the X-Corvo-Signature header format: sha256=<hex>.
 var signatureRE = regexp.MustCompile(`^sha256=([0-9a-f]{64})$`)
 
 // VerifySignature reports whether signatureHeader is a valid HMAC-SHA256
 // signature of rawBody under secret (the secret returned at webhook
 // creation).
 //
-// The header is the value of X-Corbo-Signature: "sha256=<hex>". The
+// The header is the value of X-Corvo-Signature: "sha256=<hex>". The
 // comparison is constant-time (crypto/subtle), so verification itself does
 // not leak timing information. Malformed headers, an empty secret or a
 // mismatch all return false — VerifySignature never panics.
 //
-//	signed := r.Header.Get("X-Corbo-Signature")
+//	signed := r.Header.Get("X-Corvo-Signature")
 //	if !corvonfse.VerifySignature(body, signed, secret) {
 //		// reject
 //	}

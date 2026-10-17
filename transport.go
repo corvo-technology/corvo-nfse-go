@@ -24,15 +24,14 @@ const (
 )
 
 // Unwrap selects how the response envelope is unwrapped before decoding:
-// "data" returns body.data, "data+props" returns body.data.props, and
-// "none" returns the whole body (used by list endpoints that return
-// { data, pagination } together, and by the raw health endpoints).
+// "data" returns body.data, and "none" returns the whole body (used by list
+// endpoints that return { data, pagination } together, and by the raw health
+// endpoints).
 type Unwrap string
 
 const (
-	UnwrapData      Unwrap = "data"
-	UnwrapDataProps Unwrap = "data+props"
-	UnwrapNone      Unwrap = "none"
+	UnwrapData Unwrap = "data"
+	UnwrapNone Unwrap = "none"
 )
 
 // DownloadedFile is a binary response (invoice PDF/XML) with its metadata
@@ -337,17 +336,6 @@ func unwrap(payload []byte, mode Unwrap) (json.RawMessage, bool, error) {
 	if !ok || isEmptyJSON(data) {
 		return nil, true, nil
 	}
-	if mode == UnwrapDataProps {
-		var propsEnvelope map[string]json.RawMessage
-		if err := json.Unmarshal(data, &propsEnvelope); err != nil {
-			return nil, true, nil // data is not an object: no `props` key
-		}
-		props, ok := propsEnvelope["props"]
-		if !ok || isEmptyJSON(props) {
-			return nil, true, nil
-		}
-		return props, false, nil
-	}
 	return data, false, nil
 }
 
@@ -413,9 +401,8 @@ type rawPage struct {
 	Pagination Pagination        `json:"pagination"`
 }
 
-// requestPage fetches one list page and decodes each item, unwrapping the
-// props envelope ({ props: T }) when the endpoint serializes items that way.
-func requestPage[T any](ctx context.Context, t *Transport, path string, query url.Values, propsItems bool) ([]T, Pagination, *CorvoError) {
+// requestPage fetches one list page and decodes each item.
+func requestPage[T any](ctx context.Context, t *Transport, path string, query url.Values) ([]T, Pagination, *CorvoError) {
 	page, cerr := requestJSON[rawPage](ctx, t, requestSpec{
 		method: http.MethodGet,
 		path:   path,
@@ -428,17 +415,6 @@ func requestPage[T any](ctx context.Context, t *Transport, path string, query ur
 
 	items := make([]T, 0, len(page.Data))
 	for _, raw := range page.Data {
-		if propsItems {
-			var envelope map[string]json.RawMessage
-			if err := json.Unmarshal(raw, &envelope); err != nil {
-				return nil, Pagination{}, invalidJSON(http.StatusOK, "")
-			}
-			props, ok := envelope["props"]
-			if !ok || isEmptyJSON(props) {
-				return nil, Pagination{}, invalidJSON(http.StatusOK, "")
-			}
-			raw = props
-		}
 		var item T
 		if err := json.Unmarshal(raw, &item); err != nil {
 			return nil, Pagination{}, invalidJSON(http.StatusOK, "")
@@ -452,12 +428,12 @@ func requestPage[T any](ctx context.Context, t *Transport, path string, query ur
 // until all pages are consumed or fn returns false. A page failure —
 // including the first — is surfaced as *CorvoError: iterate is the one
 // place the SDK reports failure outside the (T, *CorvoError) shape.
-func iteratePages[T any](ctx context.Context, t *Transport, path string, query url.Values, propsItems bool, fn func(T) bool) *CorvoError {
+func iteratePages[T any](ctx context.Context, t *Transport, path string, query url.Values, fn func(T) bool) *CorvoError {
 	if query == nil {
 		query = url.Values{}
 	}
 	for {
-		items, pagination, cerr := requestPage[T](ctx, t, path, query, propsItems)
+		items, pagination, cerr := requestPage[T](ctx, t, path, query)
 		if cerr != nil {
 			return cerr
 		}

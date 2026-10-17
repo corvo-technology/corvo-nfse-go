@@ -23,11 +23,11 @@ type BillingPlan struct {
 // BillingSubscription is the subscription state. Fields use snake_case
 // wire names.
 type BillingSubscription struct {
-	Status              string `json:"status"`
-	PaidUntil           string `json:"paid_until"`
-	CancelAtPeriodEnd   bool   `json:"cancel_at_period_end"`
-	ScheduledPlan       string `json:"scheduled_plan"`
-	Blocked             bool   `json:"blocked"`
+	Status            string `json:"status"`
+	PaidUntil         string `json:"paid_until"`
+	CancelAtPeriodEnd bool   `json:"cancel_at_period_end"`
+	ScheduledPlan     string `json:"scheduled_plan"`
+	Blocked           bool   `json:"blocked"`
 }
 
 // BillingUsage is the usage block of the plan response. Fields use
@@ -50,15 +50,18 @@ type BillingUsage struct {
 
 // QuotaStatus is the camelCase quota view returned by Billing.Usage.
 type QuotaStatus struct {
-	CanEmit           bool   `json:"canEmit"`
-	CreditsRemaining  int    `json:"creditsRemaining"`
-	CreditsUsed       int    `json:"creditsUsed"`
-	CreditsReserved   int    `json:"creditsReserved"`
-	MonthlyAllowance  int    `json:"monthlyAllowance"`
-	DailyUsage        int    `json:"dailyUsage"`
-	DailyLimit        int    `json:"dailyLimit"`
-	ActiveCompanies   int    `json:"activeCompanies"`
-	MaxActiveCompanies int   `json:"maxActiveCompanies"`
-	PeriodStart       string `json:"periodStart"`
-	PeriodEnd         string `json:"periodEnd"`
+	CanEmit bool `json:"canEmit"`
+	// Reason is set when CanEmit is false: no_credits, daily_limit_exceeded,
+	// company_limit_exceeded or plan_blocked.
+	Reason             string `json:"reason"`
+	CreditsRemaining   int    `json:"creditsRemaining"`
+	CreditsUsed        int    `json:"creditsUsed"`
+	CreditsReserved    int    `json:"creditsReserved"`
+	MonthlyAllowance   int    `json:"monthlyAllowance"`
+	DailyUsage         int    `json:"dailyUsage"`
+	DailyLimit         int    `json:"dailyLimit"`
+	ActiveCompanies    int    `json:"activeCompanies"`
+	MaxActiveCompanies int    `json:"maxActiveCompanies"`
+	PeriodStart        string `json:"periodStart"`
+	PeriodEnd          string `json:"periodEnd"`
 }

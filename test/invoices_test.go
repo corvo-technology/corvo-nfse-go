@@ -57,7 +57,7 @@ func TestInvoicesListPassesFiltersAndUnwrapsPropsItems(t *testing.T) {
 	client, _ := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		call = record(r)
 		writeJSON(w, http.StatusOK, `{
-			"data": [{"props": `+invoiceJSON+`}],
+			"data": [`+invoiceJSON+`],
 			"pagination": {"limit": 1, "hasMore": false, "nextCursor": null}
 		}`)
 	}))
@@ -93,7 +93,7 @@ func TestInvoicesListPassesFiltersAndUnwrapsPropsItems(t *testing.T) {
 		t.Fatalf("expected 1 invoice, got %d", len(items))
 	}
 	if items[0].NFSENumber != 1001 || items[0].Status != corvonfse.InvoiceStatusAuthorized {
-		t.Errorf("expected props item decoded, got %+v", items[0])
+		t.Errorf("expected item decoded, got %+v", items[0])
 	}
 	if items[0].Stage != corvonfse.InvoiceStageDocumentsReady {
 		t.Errorf("expected stage documents_ready, got %q", items[0].Stage)
@@ -108,7 +108,7 @@ func TestInvoicesEventsUseCursorParams(t *testing.T) {
 	client, _ := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		call = record(r)
 		writeJSON(w, http.StatusOK, `{
-			"data": [{"props": {"id": "evt_1", "invoiceId": "inv_1", "toStatus": "authorized", "reason": "ok"}}],
+			"data": [{"id": "evt_1", "invoiceId": "inv_1", "toStatus": "authorized", "reason": "ok"}],
 			"pagination": {"limit": 10, "hasMore": false, "nextCursor": null}
 		}`)
 	}))
@@ -139,13 +139,13 @@ func TestInvoicesIterateKeepsFiltersAcrossPages(t *testing.T) {
 		page++
 		if page == 1 {
 			writeJSON(w, http.StatusOK, `{
-				"data": [{"props": {"id": "inv_1"}}],
+				"data": [{"id": "inv_1"}],
 				"pagination": {"limit": 1, "hasMore": true, "nextCursor": "c1"}
 			}`)
 			return
 		}
 		writeJSON(w, http.StatusOK, `{
-			"data": [{"props": {"id": "inv_2"}}],
+			"data": [{"id": "inv_2"}],
 			"pagination": {"limit": 1, "hasMore": false, "nextCursor": null}
 		}`)
 	}))
@@ -176,7 +176,7 @@ func TestInvoicesGetUsesPropsEnvelope(t *testing.T) {
 	var call capture
 	client, _ := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		call = record(r)
-		writeJSON(w, http.StatusOK, `{"data": {"props": `+invoiceJSON+`}}`)
+		writeJSON(w, http.StatusOK, `{"data": `+invoiceJSON+`}`)
 	}))
 
 	invoice, err := client.Invoices.Get(context.Background(), "f0add80b-5026-4a11-8f00-5fa03be98b5b")
@@ -207,7 +207,7 @@ func TestInvoicesCreatePropagatesValidationDetails(t *testing.T) {
 	}))
 
 	_, err := client.Invoices.Create(context.Background(), corvonfse.InvoiceCreateParams{
-		Customer: corvonfse.InvoiceCustomerInput{Name: "Cliente", TaxID: "52998224725"},
+		Customer: &corvonfse.InvoiceCustomerInput{Name: "Cliente", TaxID: "52998224725"},
 		Service:  corvonfse.InvoiceServiceInput{Code: "000000"},
 		Amount:   10,
 	}, "")
