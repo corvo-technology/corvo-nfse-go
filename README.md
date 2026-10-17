@@ -8,7 +8,7 @@ Go SDK for the **[Corvo](https://corvo.tech) NFS-e API**: register companies, ca
 - Idempotency keys for issuing an invoice and sending an email.
 - HMAC-SHA256 webhook verification in constant time.
 
-Full API reference: <https://corvo.tech/en/api-docs>.
+Full API reference: <https://corvo.tech/en/docs>.
 
 ## Install
 
