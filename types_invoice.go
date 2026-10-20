@@ -12,7 +12,39 @@ const (
 	InvoiceStatusReconciliationRequired InvoiceStatus = "reconciliation_required"
 	InvoiceStatusManualReview           InvoiceStatus = "manual_review"
 	InvoiceStatusFailed                 InvoiceStatus = "failed"
+	// InvoiceStatusCancelling means the NFS-e cancellation event is being
+	// processed by the Sefin. Poll Invoices.Get: it ends as
+	// InvoiceStatusCancelled, or back at InvoiceStatusAuthorized with
+	// LastErrorCode/LastErrorMessage set when the Sefin rejects it.
+	InvoiceStatusCancelling InvoiceStatus = "cancelling"
+	// InvoiceStatusCancelled means the invoice is cancelled (CancelledAt is
+	// set).
+	InvoiceStatusCancelled InvoiceStatus = "cancelled"
 )
+
+// CancellationReason is why an invoice is cancelled, sent to
+// Invoices.Cancel and returned in Invoice.CancellationReason.
+type CancellationReason string
+
+const (
+	// CancellationReasonIssueError: the invoice was issued with wrong data.
+	CancellationReasonIssueError CancellationReason = "issue_error"
+	// CancellationReasonServiceNotProvided: the service was not provided.
+	CancellationReasonServiceNotProvided CancellationReason = "service_not_provided"
+	// CancellationReasonOther: any other reason (explain it in Description).
+	CancellationReasonOther CancellationReason = "other"
+)
+
+// InvoiceCancelParams are the fields accepted by Invoices.Cancel.
+type InvoiceCancelParams struct {
+	// Reason is required.
+	Reason CancellationReason `json:"reason"`
+	// Description explains the cancellation, up to 255 characters. The API
+	// requires 15 to 255 characters to cancel an authorized invoice or one
+	// being issued (processing); it is optional for a queued invoice. Empty
+	// is omitted from the request.
+	Description string `json:"description,omitempty"`
+}
 
 // InvoiceStage is the coarse emission stage of an invoice.
 type InvoiceStage string
@@ -159,6 +191,15 @@ type Invoice struct {
 	// ScheduledFor is when a scheduled invoice is released (ISO); empty for an
 	// immediate one.
 	ScheduledFor string `json:"scheduledFor"`
+	// CancellationReason is set once a cancellation was requested.
+	CancellationReason CancellationReason `json:"cancellationReason"`
+	// CancellationDescription is the description sent with the cancellation.
+	CancellationDescription string `json:"cancellationDescription"`
+	// CancelledAt is when the invoice was cancelled (ISO); empty until
+	// Status is InvoiceStatusCancelled.
+	CancelledAt string `json:"cancelledAt"`
+	// CancellationRequestedAt is when the cancellation was requested (ISO).
+	CancellationRequestedAt string `json:"cancellationRequestedAt"`
 }
 
 // InvoiceEmailSnapshot records the e-mail options in force for the invoice.

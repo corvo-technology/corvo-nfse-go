@@ -113,3 +113,27 @@ func (i *Invoices) SendEmail(ctx context.Context, id string, idempotencyKey stri
 		idempotencyKey: idempotencyKey,
 	})
 }
+
+// Cancel requests the cancellation of an invoice and returns its updated
+// state. POST /invoices/:id/cancel — unwrap "data".
+//
+// A queued invoice is cancelled at once (Status InvoiceStatusCancelled,
+// HTTP 200). An authorized invoice moves to InvoiceStatusCancelling while
+// the Sefin processes the cancellation event; an invoice still being issued
+// stays InvoiceStatusProcessing with CancellationRequestedAt set (HTTP 202).
+// Follow the outcome with Get (InvoiceStatusCancelled when done; back at
+// InvoiceStatusAuthorized with LastErrorCode/LastErrorMessage when the Sefin
+// rejects it) or the nfse.invoice.cancelled and
+// nfse.invoice.cancellation_rejected webhooks. Repeating the request
+// returns the current state.
+//
+// Invoices in retry_pending, reconciliation_required or manual_review fail
+// with a *CorvoError of Status 409 and Code ERROR_INVOICE_NOT_CANCELLABLE;
+// an invalid Description fails with Status 422.
+func (i *Invoices) Cancel(ctx context.Context, id string, params InvoiceCancelParams) (Invoice, *CorvoError) {
+	return requestJSON[Invoice](ctx, i.t, requestSpec{
+		method:   http.MethodPost,
+		path:     "/invoices/" + url.PathEscape(id) + "/cancel",
+		jsonBody: params,
+	})
+}

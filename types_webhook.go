@@ -4,7 +4,7 @@ package corvonfse
 // values are listed in WebhookEvents.
 type WebhookEvent string
 
-// WebhookEvents are the nine event types accepted when creating a
+// WebhookEvents are the eleven event types accepted when creating a
 // webhook. The webhook.test event is only sent by Webhooks.Test and cannot be
 // subscribed.
 var WebhookEvents = [...]WebhookEvent{
@@ -17,6 +17,8 @@ var WebhookEvents = [...]WebhookEvent{
 	"nfse.invoice.email_sent",
 	"nfse.invoice.email_failed",
 	"nfse.invoice.fiscal_discrepancy",
+	"nfse.invoice.cancelled",
+	"nfse.invoice.cancellation_rejected",
 }
 
 // WebhookCreateParams are the fields accepted by Webhooks.Create.
