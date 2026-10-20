@@ -94,6 +94,39 @@ invoice, err := client.Invoices.Create(ctx, corvonfse.InvoiceCreateParams{
 
 Set `Options: &corvonfse.InvoiceCreateOptions{Type: corvonfse.InvoiceTypeSchedule}` with a future `CompetenceDate` to schedule the issuance.
 
+### Cancel an invoice
+
+`Reason` is one of `CancellationReasonIssueError`, `CancellationReasonServiceNotProvided` or `CancellationReasonOther`. `Description` (up to 255 characters) is required, with 15 to 255 characters, to cancel an authorized invoice or one still being issued; it is optional for a queued invoice.
+
+```go
+invoice, err := client.Invoices.Cancel(ctx, invoice.ID, corvonfse.InvoiceCancelParams{
+	Reason:      corvonfse.CancellationReasonIssueError,
+	Description: "Valor do serviço informado errado",
+})
+if err != nil {
+	// 409 ERROR_INVOICE_NOT_CANCELLABLE for retry_pending, reconciliation_required
+	// and manual_review; 422 for an invalid description.
+	log.Fatal(err)
+}
+```
+
+A queued invoice comes back `cancelled` at once. An authorized invoice comes back `cancelling` while the Sefin processes the cancellation, and an invoice still being issued stays `processing` with `CancellationRequestedAt` set. Check the outcome later with `Get`:
+
+```go
+invoice, err = client.Invoices.Get(ctx, invoice.ID)
+switch invoice.Status {
+case corvonfse.InvoiceStatusCancelled:
+	fmt.Println("cancelled at", invoice.CancelledAt)
+case corvonfse.InvoiceStatusCancelling:
+	// still in progress: check again later
+case corvonfse.InvoiceStatusAuthorized:
+	// the Sefin rejected the cancellation
+	fmt.Println(invoice.LastErrorCode, invoice.LastErrorMessage)
+}
+```
+
+The webhooks `nfse.invoice.cancelled` and `nfse.invoice.cancellation_rejected` report the same outcome. Cancelling an authorized NFS-e does not refund the credit.
+
 ### Lists and iteration
 
 ```go
@@ -137,7 +170,7 @@ if !corvonfse.VerifySignature(body, r.Header.Get("X-Corvo-Signature"), secret) {
 | --- | --- |
 | `client.Companies` | `Create`, `Get`, `Update`, `Remove`, `List`, `Iterate` |
 | `client.Certificates` | `Upload`, `List`, `Remove` |
-| `client.Invoices` | `Create`, `Calculate`, `Get`, `List`, `Iterate`, `Events`, `PDF`, `XML`, `DownloadURL`, `SendEmail` |
+| `client.Invoices` | `Create`, `Calculate`, `Get`, `List`, `Iterate`, `Events`, `PDF`, `XML`, `DownloadURL`, `SendEmail`, `Cancel` |
 | `client.Webhooks` | `List`, `Create`, `Remove`, `Test` + `Deliveries.List/Iterate/Stats/Retry` |
 | `client.Credits` | `Balance`, `Plans`, `History`, `IterateHistory` |
 | `client.Billing` | `Plan`, `Usage` |
