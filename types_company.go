@@ -1,14 +1,13 @@
 package corvonfse
 
 // TaxRegime is one of the Brazilian corporate tax regimes accepted when
-// creating a company.
+// creating a company. Corvo serves only MEI and Simples Nacional: any other
+// value is rejected with 422 ERROR_TAX_REGIME_NOT_SUPPORTED.
 type TaxRegime string
 
 const (
 	TaxRegimeMEI             TaxRegime = "MEI"
 	TaxRegimeSimplesNacional TaxRegime = "Simples Nacional"
-	TaxRegimeLucroPresumido  TaxRegime = "Lucro Presumido"
-	TaxRegimeLucroReal       TaxRegime = "Lucro Real"
 )
 
 // CompanyAddressInput is the address supplied when creating or updating a
@@ -41,26 +40,38 @@ type CompanyCreateParams struct {
 	SendMunicipalReg *bool `json:"sendMunicipalReg,omitempty"`
 	// DefaultServiceCode is the national service code (6 digits) used when an
 	// invoice omits service.code.
-	DefaultServiceCode string               `json:"defaultServiceCode,omitempty"`
-	SimpleNational     *bool                `json:"simpleNational,omitempty"`
-	SpecialRegime      string               `json:"specialRegime,omitempty"`
-	Address            *CompanyAddressInput `json:"address,omitempty"`
+	DefaultServiceCode string `json:"defaultServiceCode,omitempty"`
+	SimpleNational     *bool  `json:"simpleNational,omitempty"`
+	SpecialRegime      string `json:"specialRegime,omitempty"`
+	// SimplesRate is required for Simples Nacional and ignored for MEI: the
+	// effective total rate (%) of your DAS, as in the PGDAS-D, e.g. "6.54"
+	// (0 to 100, at most 2 decimals).
+	SimplesRate string `json:"simplesRate,omitempty"`
+	// SimplesIssRate (Simples Nacional only) is the effective ISS rate (%) of
+	// your bracket (1.80 to 5.00), needed when a customer withholds ISS.
+	SimplesIssRate string               `json:"simplesIssRate,omitempty"`
+	Address        *CompanyAddressInput `json:"address,omitempty"`
 }
 
 // CompanyUpdateParams are the fields accepted by Companies.Update. Fields
 // left at their zero value are omitted from the request, leaving the
 // server-side value unchanged.
 type CompanyUpdateParams struct {
-	LegalName          string               `json:"legalName,omitempty"`
-	TradeName          string               `json:"tradeName,omitempty"`
-	MunicipalReg       string               `json:"municipalReg,omitempty"`
-	SendMunicipalReg   *bool                `json:"sendMunicipalReg,omitempty"`
-	MunicipalityCode   string               `json:"municipalityCode,omitempty"`
-	DefaultServiceCode string               `json:"defaultServiceCode,omitempty"`
-	TaxRegime          TaxRegime            `json:"taxRegime,omitempty"`
-	SimpleNational     *bool                `json:"simpleNational,omitempty"`
-	SpecialRegime      string               `json:"specialRegime,omitempty"`
-	Address            *CompanyAddressInput `json:"address,omitempty"`
+	LegalName          string    `json:"legalName,omitempty"`
+	TradeName          string    `json:"tradeName,omitempty"`
+	MunicipalReg       string    `json:"municipalReg,omitempty"`
+	SendMunicipalReg   *bool     `json:"sendMunicipalReg,omitempty"`
+	MunicipalityCode   string    `json:"municipalityCode,omitempty"`
+	DefaultServiceCode string    `json:"defaultServiceCode,omitempty"`
+	TaxRegime          TaxRegime `json:"taxRegime,omitempty"`
+	SimpleNational     *bool     `json:"simpleNational,omitempty"`
+	SpecialRegime      string    `json:"specialRegime,omitempty"`
+	// SimplesRate updates the Simples rate (%), e.g. "6.54", for example every
+	// month. Leave empty to keep the current value. Ignored for MEI.
+	SimplesRate string `json:"simplesRate,omitempty"`
+	// SimplesIssRate updates the ISS rate (%) of the Simples bracket.
+	SimplesIssRate string               `json:"simplesIssRate,omitempty"`
+	Address        *CompanyAddressInput `json:"address,omitempty"`
 }
 
 // Company is a fiscal company (emitente) registered with the API. Optional

@@ -12,7 +12,26 @@ const (
 	InvoiceStatusReconciliationRequired InvoiceStatus = "reconciliation_required"
 	InvoiceStatusManualReview           InvoiceStatus = "manual_review"
 	InvoiceStatusFailed                 InvoiceStatus = "failed"
+	InvoiceStatusCancelling             InvoiceStatus = "cancelling"
+	InvoiceStatusCancelled              InvoiceStatus = "cancelled"
 )
+
+// InvoiceCancellationReason is why an invoice is being cancelled.
+type InvoiceCancellationReason string
+
+const (
+	CancellationIssueError         InvoiceCancellationReason = "issue_error"
+	CancellationServiceNotProvided InvoiceCancellationReason = "service_not_provided"
+	CancellationOther              InvoiceCancellationReason = "other"
+)
+
+// InvoiceCancelParams are the fields accepted by Invoices.Cancel. Description
+// (15 to 255 characters) is required to cancel an authorized or processing
+// invoice and optional for a queued one.
+type InvoiceCancelParams struct {
+	Reason      InvoiceCancellationReason `json:"reason"`
+	Description string                    `json:"description,omitempty"`
+}
 
 // InvoiceStage is the coarse emission stage of an invoice.
 type InvoiceStage string
@@ -97,8 +116,14 @@ type InvoiceCreateParams struct {
 	Amount float64 `json:"amount"`
 	// CompetenceDate is YYYY-MM-DD.
 	CompetenceDate string `json:"competenceDate"`
-	// Discount is the unconditional discount in BRL, from 0 up to Amount.
+	// Discount is the unconditional discount in BRL, from 0 up to Amount, at
+	// most 2 decimal places.
 	Discount *float64 `json:"discount,omitempty"`
+	// Deduction is the ISS base deduction declared by the issuer, in BRL:
+	// greater than 0 and less than Amount minus Discount, at most 2 decimal
+	// places (0 is the same as omitting it). The invoice is still issued for
+	// the full Amount; the issuer is responsible for the declared value.
+	Deduction *float64 `json:"deduction,omitempty"`
 	// Email requests the e-mail notification (default false);
 	// Options.Email.Send wins when set.
 	Email   *bool                 `json:"email,omitempty"`
@@ -121,44 +146,97 @@ type InvoiceListParams struct {
 // value when null. TaxSnapshot holds provider-specific tax details as
 // returned by the API, unchanged.
 type Invoice struct {
-	ID                  string                  `json:"id"`
-	CompanyID           string                  `json:"companyId"`
-	TenantID            string                  `json:"tenantId"`
-	Environment         Environment             `json:"environment"`
-	DocumentKeyVersion  int                     `json:"documentKeyVersion"`
-	EmailSnapshot       InvoiceEmailSnapshot    `json:"emailSnapshot"`
-	ExternalID          string                  `json:"externalId"`
-	IdempotencyKey      string                  `json:"idempotencyKey"`
-	Status              InvoiceStatus           `json:"status"`
-	CustomerSnapshot    InvoiceCustomerSnapshot `json:"customerSnapshot"`
-	ServiceSnapshot     InvoiceServiceSnapshot  `json:"serviceSnapshot"`
-	TaxSnapshot         map[string]any          `json:"taxSnapshot"`
-	Amount              float64                 `json:"amount"`
-	Currency            string                  `json:"currency"`
-	CompetenceDate      string                  `json:"competenceDate"`
-	DPSID               string                  `json:"dpsId"`
-	DPSSeries           string                  `json:"dpsSeries"`
-	DPSNumber           int                     `json:"dpsNumber"`
-	AccessKey           string                  `json:"accessKey"`
-	NFSENumber          int                     `json:"nfseNumber"`
-	FiscalProvider      string                  `json:"fiscalProvider"`
-	FiscalSchemaVersion string                  `json:"fiscalSchemaVersion"`
-	IssuedAt            string                  `json:"issuedAt"`
-	AuthorizedAt        string                  `json:"authorizedAt"`
-	LastErrorCode       string                  `json:"lastErrorCode"`
-	LastErrorMessage    string                  `json:"lastErrorMessage"`
-	LastErrorProvider   string                  `json:"lastErrorProvider"`
-	DocumentsReadyAt    string                  `json:"documentsReadyAt"`
-	LastEmailStatus     string                  `json:"lastEmailStatus"`
-	LastEmailSentAt     string                  `json:"lastEmailSentAt"`
-	CreatedAt           string                  `json:"createdAt"`
-	UpdatedAt           string                  `json:"updatedAt"`
-	DocumentsStatus     string                  `json:"documentsStatus"`
-	EmailStatus         string                  `json:"emailStatus"`
-	Stage               InvoiceStage            `json:"stage"`
+	ID                 string                  `json:"id"`
+	CompanyID          string                  `json:"companyId"`
+	TenantID           string                  `json:"tenantId"`
+	Environment        Environment             `json:"environment"`
+	DocumentKeyVersion int                     `json:"documentKeyVersion"`
+	EmailSnapshot      InvoiceEmailSnapshot    `json:"emailSnapshot"`
+	ExternalID         string                  `json:"externalId"`
+	IdempotencyKey     string                  `json:"idempotencyKey"`
+	Status             InvoiceStatus           `json:"status"`
+	CustomerSnapshot   InvoiceCustomerSnapshot `json:"customerSnapshot"`
+	ServiceSnapshot    InvoiceServiceSnapshot  `json:"serviceSnapshot"`
+	TaxSnapshot        map[string]any          `json:"taxSnapshot"`
+	Amount             float64                 `json:"amount"`
+	// Discount and Deduction are set only when declared on the invoice.
+	Discount            *float64     `json:"discount,omitempty"`
+	Deduction           *float64     `json:"deduction,omitempty"`
+	Currency            string       `json:"currency"`
+	CompetenceDate      string       `json:"competenceDate"`
+	DPSID               string       `json:"dpsId"`
+	DPSSeries           string       `json:"dpsSeries"`
+	DPSNumber           int          `json:"dpsNumber"`
+	AccessKey           string       `json:"accessKey"`
+	NFSENumber          int          `json:"nfseNumber"`
+	FiscalProvider      string       `json:"fiscalProvider"`
+	FiscalSchemaVersion string       `json:"fiscalSchemaVersion"`
+	IssuedAt            string       `json:"issuedAt"`
+	AuthorizedAt        string       `json:"authorizedAt"`
+	LastErrorCode       string       `json:"lastErrorCode"`
+	LastErrorMessage    string       `json:"lastErrorMessage"`
+	LastErrorProvider   string       `json:"lastErrorProvider"`
+	DocumentsReadyAt    string       `json:"documentsReadyAt"`
+	LastEmailStatus     string       `json:"lastEmailStatus"`
+	LastEmailSentAt     string       `json:"lastEmailSentAt"`
+	CreatedAt           string       `json:"createdAt"`
+	UpdatedAt           string       `json:"updatedAt"`
+	DocumentsStatus     string       `json:"documentsStatus"`
+	EmailStatus         string       `json:"emailStatus"`
+	Stage               InvoiceStage `json:"stage"`
 	// ScheduledFor is when a scheduled invoice is released (ISO); empty for an
 	// immediate one.
 	ScheduledFor string `json:"scheduledFor"`
+	// CancellationReason and CancellationDescription echo the cancellation
+	// request; CancelledAt is when the invoice reached "cancelled" and
+	// CancellationRequestedAt when a cancellation was requested while it was
+	// still processing. All are empty until a cancellation is requested.
+	CancellationReason      InvoiceCancellationReason `json:"cancellationReason"`
+	CancellationDescription string                    `json:"cancellationDescription"`
+	CancelledAt             string                    `json:"cancelledAt"`
+	CancellationRequestedAt string                    `json:"cancellationRequestedAt"`
+}
+
+// InvoiceBatchItem is one item of Invoices.CreateBatch: the fields of
+// InvoiceCreateParams plus its own idempotency key.
+type InvoiceBatchItem struct {
+	InvoiceCreateParams
+	// IdempotencyKey (up to 255 characters) makes the item safe to retry:
+	// repeating it with the same content returns the saved invoice with
+	// Replayed set. The Idempotency-Key header is not used by the batch route.
+	IdempotencyKey string `json:"idempotencyKey,omitempty"`
+}
+
+// InvoiceBatchError is why a batch item was rejected. Rejected items are not
+// saved. Details holds the field-level issues, when there are any.
+type InvoiceBatchError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Details any    `json:"details,omitempty"`
+}
+
+// InvoiceBatchResult is the outcome of one batch item.
+type InvoiceBatchResult struct {
+	// Index is the position of the item in the request, starting at 0.
+	Index int `json:"index"`
+	// Status is "accepted" or "rejected".
+	Status string `json:"status"`
+	// Replayed is true when the item repeated an idempotency key already saved
+	// with the same content.
+	Replayed bool `json:"replayed"`
+	// Invoice is set when Status is "accepted".
+	Invoice *Invoice `json:"invoice,omitempty"`
+	// Error is set when Status is "rejected".
+	Error *InvoiceBatchError `json:"error,omitempty"`
+}
+
+// InvoiceBatchSummary is the result of Invoices.CreateBatch.
+type InvoiceBatchSummary struct {
+	Total    int `json:"total"`
+	Accepted int `json:"accepted"`
+	Rejected int `json:"rejected"`
+	// Results has one entry per item, in the order sent.
+	Results []InvoiceBatchResult `json:"results"`
 }
 
 // InvoiceEmailSnapshot records the e-mail options in force for the invoice.

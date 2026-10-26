@@ -39,6 +39,23 @@ func (i *Invoices) Create(ctx context.Context, params InvoiceCreateParams, idemp
 	})
 }
 
+// CreateBatch issues 1 to 50 invoices in one call, for one company or several.
+// Items are checked one by one: valid ones are saved together, invalid ones
+// come back rejected and are not saved. Match Results[i].Index to the item you
+// sent, fix only the rejected ones and send them again. Set IdempotencyKey on
+// each item; the Idempotency-Key header is not used by this route.
+//
+// POST /invoices/batches — unwrap "data". Returns 202.
+func (i *Invoices) CreateBatch(ctx context.Context, items []InvoiceBatchItem) (InvoiceBatchSummary, *CorvoError) {
+	return requestJSON[InvoiceBatchSummary](ctx, i.t, requestSpec{
+		method: http.MethodPost,
+		path:   "/invoices/batches",
+		jsonBody: struct {
+			Invoices []InvoiceBatchItem `json:"invoices"`
+		}{Invoices: items},
+	})
+}
+
 // Calculate estimates the taxes of an invoice without issuing, storing or
 // charging anything. A fiscal gap is not an error: the result comes back with
 // Status "blocked", Blocking and PendingFields set.
@@ -111,5 +128,20 @@ func (i *Invoices) SendEmail(ctx context.Context, id string, idempotencyKey stri
 		method:         http.MethodPost,
 		path:           "/invoices/" + url.PathEscape(id) + "/email",
 		idempotencyKey: idempotencyKey,
+	})
+}
+
+// Cancel cancels an invoice. A queued invoice is cancelled at once (Status
+// "cancelled"); an authorized one moves to "cancelling" while the cancellation
+// is processed, and a processing one stays "processing" with
+// CancellationRequestedAt set. Call Get later: "cancelled" when done, or back
+// to "authorized" with LastErrorCode when the cancellation was rejected.
+//
+// POST /invoices/:id/cancel — unwrap "data". Returns 200 or 202.
+func (i *Invoices) Cancel(ctx context.Context, id string, params InvoiceCancelParams) (Invoice, *CorvoError) {
+	return requestJSON[Invoice](ctx, i.t, requestSpec{
+		method:   http.MethodPost,
+		path:     "/invoices/" + url.PathEscape(id) + "/cancel",
+		jsonBody: params,
 	})
 }
