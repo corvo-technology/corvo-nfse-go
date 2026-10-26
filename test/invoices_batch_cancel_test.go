@@ -96,9 +96,3 @@ func TestInvoicesCancelReturnsTheTypedError(t *testing.T) {
 		t.Fatalf("expected ERROR_INVOICE_NOT_CANCELLABLE (409), got %+v", err)
 	}
 }
-
-func TestWebhookEventsIncludeCancellation(t *testing.T) {
-	if len(corvonfse.WebhookEvents) != 11 {
-		t.Fatalf("expected 11 webhook events, got %d", len(corvonfse.WebhookEvents))
-	}
-}

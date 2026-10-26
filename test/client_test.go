@@ -157,10 +157,13 @@ func TestVersionAndWebhookEvents(t *testing.T) {
 	if corvonfse.Version != "0.1.1" {
 		t.Errorf("expected Version 0.1.1, got %q", corvonfse.Version)
 	}
-	if len(corvonfse.WebhookEvents) != 9 {
-		t.Fatalf("expected 9 webhook events, got %d", len(corvonfse.WebhookEvents))
+	if len(corvonfse.WebhookEvents) != 11 {
+		t.Fatalf("expected 11 webhook events, got %d", len(corvonfse.WebhookEvents))
 	}
 	if corvonfse.WebhookEvents[8] != "nfse.invoice.fiscal_discrepancy" {
-		t.Errorf("expected last event nfse.invoice.fiscal_discrepancy, got %q", corvonfse.WebhookEvents[8])
+		t.Errorf("expected event 9 nfse.invoice.fiscal_discrepancy, got %q", corvonfse.WebhookEvents[8])
+	}
+	if corvonfse.WebhookEvents[10] != "nfse.invoice.cancellation_rejected" {
+		t.Errorf("expected last event nfse.invoice.cancellation_rejected, got %q", corvonfse.WebhookEvents[10])
 	}
 }
