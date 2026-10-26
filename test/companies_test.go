@@ -121,7 +121,8 @@ func TestCompaniesUpdatePatchesGivenFields(t *testing.T) {
 
 	_, err := client.Companies.Update(context.Background(), "cmp_1", corvonfse.CompanyUpdateParams{
 		MunicipalReg: "654321",
-		TaxRegime:    corvonfse.TaxRegimeLucroPresumido,
+		TaxRegime:    corvonfse.TaxRegimeSimplesNacional,
+		SimplesRate:  "6.54",
 	})
 	if err != nil {
 		t.Fatalf("companies.update: %v", err)
@@ -131,6 +132,9 @@ func TestCompaniesUpdatePatchesGivenFields(t *testing.T) {
 	}
 	if !strings.Contains(call.body, `"municipalReg":"654321"`) {
 		t.Errorf("expected municipalReg in body, got %s", call.body)
+	}
+	if !strings.Contains(call.body, `"simplesRate":"6.54"`) {
+		t.Errorf("expected simplesRate in body, got %s", call.body)
 	}
 	if strings.Contains(call.body, `"legalName"`) {
 		t.Errorf("expected unset fields to be omitted, got %s", call.body)

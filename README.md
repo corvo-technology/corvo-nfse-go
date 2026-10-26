@@ -55,7 +55,8 @@ func main() {
 company, err := client.Companies.Create(ctx, corvonfse.CompanyCreateParams{
 	LegalName:          "Empresa Exemplo Ltda",
 	TaxID:              "11222333000181",
-	TaxRegime:          corvonfse.TaxRegimeSimplesNacional,
+	TaxRegime:          corvonfse.TaxRegimeSimplesNacional, // MEI or Simples Nacional: the only regimes Corvo serves
+	SimplesRate:        "6.54",                             // required for Simples Nacional: effective DAS rate (%), ignored for MEI
 	MunicipalityCode:   "3550308", // IBGE code, 7 digits
 	DefaultServiceCode: "010101",  // optional: used when an invoice omits service.code
 })
@@ -93,6 +94,48 @@ invoice, err := client.Invoices.Create(ctx, corvonfse.InvoiceCreateParams{
 ```
 
 Set `Options: &corvonfse.InvoiceCreateOptions{Type: corvonfse.InvoiceTypeSchedule}` with a future `CompetenceDate` to schedule the issuance.
+
+To declare a deduction from the ISS base, set `Deduction` (greater than 0 and less than `Amount` minus `Discount`). The invoice is still issued for the full `Amount`, and you are responsible for the declared value.
+
+### Issue up to 50 invoices at once
+
+`CreateBatch` takes 1 to 50 items (they can belong to different companies). Items are checked one by one: valid ones are saved together, invalid ones come back `rejected` and are not saved. Set `IdempotencyKey` on each item, so repeating the batch after a timeout returns the saved ones with `Replayed`.
+
+```go
+summary, err := client.Invoices.CreateBatch(ctx, []corvonfse.InvoiceBatchItem{
+	{
+		InvoiceCreateParams: corvonfse.InvoiceCreateParams{
+			CompanyTaxID:   "11222333000181",
+			Service:        corvonfse.InvoiceServiceInput{Description: "Consultoria"},
+			Amount:         150.50,
+			CompetenceDate: "2026-10-16",
+		},
+		IdempotencyKey: "sheet-row-2",
+	},
+})
+for _, r := range summary.Results {
+	if r.Status == "rejected" {
+		fmt.Println(r.Index, r.Error.Code, r.Error.Message)
+	}
+}
+```
+
+The route allows 10 batches per minute per tenant (`429` with `Retry-After`).
+
+### Cancel an invoice
+
+```go
+invoice, err := client.Invoices.Cancel(ctx, invoiceID, corvonfse.InvoiceCancelParams{
+	Reason:      corvonfse.CancellationIssueError, // or CancellationServiceNotProvided, CancellationOther
+	Description: "Wrong amount on the invoice",
+})
+```
+
+- `queued`: cancelled at once, `Status` is `cancelled` with `CancelledAt` set.
+- `authorized`: `Status` is `cancelling` while the cancellation is processed at the Sefin. The issuance credit is not refunded.
+- `processing`: stays `processing` with `CancellationRequestedAt` set and is cancelled once authorized.
+
+`Description` (15 to 255 characters) is required for an authorized or processing invoice and optional for a queued one. Read the invoice again (or listen to the `nfse.invoice.cancelled` and `nfse.invoice.cancellation_rejected` webhooks) to see the outcome: `cancelled`, or back to `authorized` with `LastErrorCode` when the cancellation was rejected.
 
 ### Lists and iteration
 
@@ -137,7 +180,7 @@ if !corvonfse.VerifySignature(body, r.Header.Get("X-Corvo-Signature"), secret) {
 | --- | --- |
 | `client.Companies` | `Create`, `Get`, `Update`, `Remove`, `List`, `Iterate` |
 | `client.Certificates` | `Upload`, `List`, `Remove` |
-| `client.Invoices` | `Create`, `Calculate`, `Get`, `List`, `Iterate`, `Events`, `PDF`, `XML`, `DownloadURL`, `SendEmail` |
+| `client.Invoices` | `Create`, `CreateBatch`, `Calculate`, `Get`, `List`, `Iterate`, `Events`, `PDF`, `XML`, `DownloadURL`, `SendEmail`, `Cancel` |
 | `client.Webhooks` | `List`, `Create`, `Remove`, `Test` + `Deliveries.List/Iterate/Stats/Retry` |
 | `client.Credits` | `Balance`, `Plans`, `History`, `IterateHistory` |
 | `client.Billing` | `Plan`, `Usage` |
