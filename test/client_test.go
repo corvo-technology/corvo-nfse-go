@@ -154,8 +154,8 @@ func TestHealthLiveReturnsRawObject(t *testing.T) {
 }
 
 func TestVersionAndWebhookEvents(t *testing.T) {
-	if corvonfse.Version != "0.1.1" {
-		t.Errorf("expected Version 0.1.1, got %q", corvonfse.Version)
+	if corvonfse.Version != "0.2.0" {
+		t.Errorf("expected Version 0.2.0, got %q", corvonfse.Version)
 	}
 	if len(corvonfse.WebhookEvents) != 11 {
 		t.Fatalf("expected 11 webhook events, got %d", len(corvonfse.WebhookEvents))
