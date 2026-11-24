@@ -80,6 +80,12 @@ var callers = map[string]func(ctx context.Context, c *corvonfse.Client){
 	"credits_listPlans": func(ctx context.Context, c *corvonfse.Client) {
 		_, _, _ = c.Credits.Plans(ctx, nil)
 	},
+	"plans_get": func(ctx context.Context, c *corvonfse.Client) {
+		_, _ = c.Plans.Get(ctx, sid, "")
+	},
+	"plans_list": func(ctx context.Context, c *corvonfse.Client) {
+		_, _, _ = c.Plans.List(ctx, nil)
+	},
 	"credits_previewPurchase": func(ctx context.Context, c *corvonfse.Client) {
 		_, _ = c.Credits.PreviewPurchase(ctx, 3)
 	},
@@ -377,8 +383,8 @@ func expectedPath(template string) string {
 
 func TestContractCoverage(t *testing.T) {
 	ops := loadSpec(t)
-	if len(ops) != 92 {
-		t.Fatalf("expected 92 operations in spec/openapi.json (contract 0.3.0), got %d: update the SDK and this count together", len(ops))
+	if len(ops) != 94 {
+		t.Fatalf("expected 94 operations in spec/openapi.json (contract 0.3.0), got %d: update the SDK and this count together", len(ops))
 	}
 
 	inSpec := map[string]bool{}

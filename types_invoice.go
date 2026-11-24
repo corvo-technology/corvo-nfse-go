@@ -239,9 +239,9 @@ type Invoice struct {
 	CompetenceDate      string   `json:"competenceDate"`
 	DPSID               string   `json:"dpsId"`
 	DPSSeries           string   `json:"dpsSeries"`
-	DPSNumber           int      `json:"dpsNumber"`
+	DPSNumber           int64    `json:"dpsNumber"`
 	AccessKey           string   `json:"accessKey"`
-	NFSENumber          int      `json:"nfseNumber"`
+	NFSENumber          int64    `json:"nfseNumber"`
 	FiscalProvider      string   `json:"fiscalProvider"`
 	FiscalSchemaVersion string   `json:"fiscalSchemaVersion"`
 	IssuedAt            string   `json:"issuedAt"`

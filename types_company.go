@@ -61,8 +61,7 @@ type CompanyCreateParams struct {
 // left at their zero value are omitted from the request, leaving the
 // server-side value unchanged.
 type CompanyUpdateParams struct {
-	// TaxID is the CNPJ.
-	TaxID              string    `json:"taxId,omitempty"`
+	// The CNPJ (taxId) cannot be changed, so it is not accepted here.
 	LegalName          string    `json:"legalName,omitempty"`
 	TradeName          string    `json:"tradeName,omitempty"`
 	MunicipalReg       string    `json:"municipalReg,omitempty"`

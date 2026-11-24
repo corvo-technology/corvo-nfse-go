@@ -67,16 +67,23 @@ type PurchasePreview struct {
 	TotalCents     int `json:"totalCents"`
 }
 
-// PlanQuote is a public catalog entry (GET /plans): prices in centavos,
-// monthly cycle only.
-type PlanQuote struct {
-	Slug                  string `json:"slug"`
-	Name                  string `json:"name"`
-	MonthlyAllowance      int    `json:"monthlyAllowance"`
-	BasePriceCents        int    `json:"basePriceCents"`
-	PerCreditOverageCents int    `json:"perCreditOverageCents"`
-	MonthlyTotalCents     int    `json:"monthlyTotalCents"`
-	Currency              string `json:"currency"`
+// PlanPrice is a public catalog entry (GET /plans, GET /plans/{slug}): prices
+// in centavos for the chosen billing cycle.
+type PlanPrice struct {
+	Slug                   string `json:"slug"`
+	Name                   string `json:"name"`
+	MonthlyAllowance       int    `json:"monthlyAllowance"`
+	BasePriceCents         int    `json:"basePriceCents"`
+	MonthlyEquivalentCents int    `json:"monthlyEquivalentCents"`
+	ChargeTotalCents       int    `json:"chargeTotalCents"`
+	Currency               string `json:"currency"`
+}
+
+// PlansParams are the optional parameters of Plans.List. Cycle is "monthly"
+// (default) or "annual" (discounted).
+type PlansParams struct {
+	ListParams
+	Cycle string
 }
 
 // PlanRecommendation is the plan recommended for a monthly volume

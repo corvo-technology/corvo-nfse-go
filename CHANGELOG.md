@@ -2,7 +2,7 @@
 
 ## 0.3.0
 
-Follows the public API contract 0.3.0 (OpenAPI at <https://corvo.tech/openapi.json>, vendored in `spec/openapi.json`). The SDK now covers all 92 operations.
+Follows the public API contract 0.3.0 (OpenAPI at <https://corvo.tech/openapi.json>, vendored in `spec/openapi.json`). The SDK now covers all 94 operations.
 
 ### Breaking
 
@@ -25,6 +25,13 @@ Follows the public API contract 0.3.0 (OpenAPI at <https://corvo.tech/openapi.js
 - `TestContractCoverage`: loads `spec/openapi.json` and fails when an operation is missing or calls the wrong method or path.
 
 ### Changed
+
+- Public price catalog: `Plans.List` and `Plans.Get` (`GET /plans`, `GET /plans/{slug}`, no API key) return `PlanPrice` and take the billing `cycle` (`monthly` or `annual`); `Plans.List` takes `*PlansParams`, `Plans.Get` takes the cycle as its last argument.
+- `PackageSummary.Total` is a string decimal such as `"1234.50"` (it was a number).
+- `CompanyUpdateParams` no longer has `TaxID`: the CNPJ cannot be changed.
+- `Invoice.NFSENumber`, `Invoice.DPSNumber` and `DPSSequenceInfo.LastNumber` are `int64`.
+- Nullable fields of the contract (company address, `tradeName`, rates, invoice e-mail status, cancellation reason, portal flag, and `classification`, `applicability` and `calculation` of a calculation) decode as empty or nil.
+- `Imports.Emit` and `Invoices.SendEmail` send no body when there are no parameters.
 
 - Error `details` that is an object (not an array) no longer breaks error parsing.
 - CI: Go 1.22, 1.23 and stable with `-race`, gofmt check and golangci-lint.

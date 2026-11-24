@@ -121,17 +121,18 @@ type AccountantSend struct {
 
 // PackageSummary is the count and total of the month package.
 type PackageSummary struct {
-	CompanyName  string  `json:"companyName"`
-	CompanyTaxID string  `json:"companyTaxId"`
-	Count        int     `json:"count"`
-	Limit        int     `json:"limit"`
-	Month        string  `json:"month"`
-	Total        float64 `json:"total"`
+	CompanyName  string `json:"companyName"`
+	CompanyTaxID string `json:"companyTaxId"`
+	Count        int    `json:"count"`
+	Limit        int    `json:"limit"`
+	Month        string `json:"month"`
+	// Total is a decimal string with two places, such as "1234.50".
+	Total string `json:"total"`
 }
 
 // DPSSequenceInfo is the DPS numbering of a company.
 type DPSSequenceInfo struct {
-	LastNumber int    `json:"lastNumber"`
+	LastNumber int64  `json:"lastNumber"`
 	Series     string `json:"series"`
 }
 

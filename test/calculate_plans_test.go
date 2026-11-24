@@ -67,27 +67,27 @@ func TestPlansCatalog(t *testing.T) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/v1/plans/quote"):
 			writeJSON(w, http.StatusOK, `{"data":{"volume":20000,"recommended_plan":"volume","total_estimated_cents":179990}}`)
-		case r.URL.Path == "/v1/plans/growth":
-			writeJSON(w, http.StatusOK, `{"data":{"slug":"growth","monthlyAllowance":750,"monthlyTotalCents":8990}}`)
+		case r.URL.Path == "/v1/plans/solo":
+			writeJSON(w, http.StatusOK, `{"data":{"slug":"solo","monthlyAllowance":750,"chargeTotalCents":89900,"monthlyEquivalentCents":7490}}`)
 		default:
-			writeJSON(w, http.StatusOK, `{"data":[{"slug":"developer","monthlyAllowance":200}],"pagination":{"limit":5,"hasMore":false,"nextCursor":null}}`)
+			writeJSON(w, http.StatusOK, `{"data":[{"slug":"solo","monthlyAllowance":200}],"pagination":{"limit":5,"hasMore":false,"nextCursor":null}}`)
 		}
 	}))
 	ctx := context.Background()
 
-	items, page, err := client.Plans.List(ctx, &corvonfse.ListParams{Limit: 5})
-	if err != nil || len(items) != 1 || items[0].Slug != "developer" || page.HasMore {
+	items, page, err := client.Plans.List(ctx, &corvonfse.PlansParams{ListParams: corvonfse.ListParams{Limit: 5}})
+	if err != nil || len(items) != 1 || items[0].Slug != "solo" || page.HasMore {
 		t.Fatalf("list: %+v %+v %v", items, page, err)
 	}
-	plan, err := client.Plans.Get(ctx, "growth")
-	if err != nil || plan.MonthlyTotalCents != 8990 {
+	plan, err := client.Plans.Get(ctx, "solo", "annual")
+	if err != nil || plan.ChargeTotalCents != 89900 || plan.MonthlyEquivalentCents != 7490 {
 		t.Fatalf("get: %+v %v", plan, err)
 	}
 	quote, err := client.Plans.Quote(ctx, 20000)
 	if err != nil || quote == nil || quote.RecommendedPlan != "volume" || quote.TotalEstimatedCents != 179990 {
 		t.Fatalf("quote: %+v %v", quote, err)
 	}
-	want := []string{"/v1/plans?limit=5", "/v1/plans/growth", "/v1/plans/quote?volume=20000"}
+	want := []string{"/v1/plans?limit=5", "/v1/plans/solo?cycle=annual", "/v1/plans/quote?volume=20000"}
 	for i, p := range want {
 		if paths[i] != p {
 			t.Errorf("request %d: got %s want %s", i, paths[i], p)
@@ -102,5 +102,24 @@ func TestPlansQuoteNullWhenVolumeIsInvalid(t *testing.T) {
 	quote, err := client.Plans.Quote(context.Background(), 0)
 	if err != nil || quote != nil {
 		t.Errorf("expected (nil, nil), got %+v %v", quote, err)
+	}
+}
+
+func TestNullableFieldsDecode(t *testing.T) {
+	var call capture
+	client := single(t, &call, http.StatusOK, `{"data":{"preEmission":true,"status":"blocked","classification":null,"applicability":null,"calculation":null}}`)
+	result, err := client.Invoices.Calculate(context.Background(), corvonfse.InvoiceCreateParams{})
+	if err != nil || result.Classification != nil || result.Applicability != nil || result.Calculation != nil {
+		t.Fatalf("calculate with nulls: %+v %v", result, err)
+	}
+	client = single(t, &call, http.StatusOK, `{"data":{"id":"co_1","tradeName":null,"municipalReg":null,"addressStreet":null,"simplesRate":null,"defaultServiceCode":null}}`)
+	company, err := client.Companies.Get(context.Background(), "co_1")
+	if err != nil || company.ID != "co_1" || company.TradeName != "" {
+		t.Fatalf("company with nulls: %+v %v", company, err)
+	}
+	client = single(t, &call, http.StatusOK, `{"data":{"id":"inv_1","dpsNumber":123456789012345,"nfseNumber":9007199254740991,"emailStatus":null,"portalFlag":null,"cancellationReason":null}}`)
+	invoice, err := client.Invoices.Get(context.Background(), "inv_1")
+	if err != nil || invoice.NFSENumber != 9007199254740991 || invoice.DPSNumber != 123456789012345 || invoice.EmailStatus != "" {
+		t.Fatalf("invoice with nulls: %+v %v", invoice, err)
 	}
 }

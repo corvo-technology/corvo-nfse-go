@@ -182,14 +182,14 @@ func (i *Imports) Get(ctx context.Context, id string) (ImportJob, *CorvoError) {
 // Emit sends every valid row to be issued; it is safe to call twice. params is
 // optional. POST /imports/:id/emit — unwrap "data". Returns 202.
 func (i *Imports) Emit(ctx context.Context, id string, params *ImportEmitParams) (ImportJob, *CorvoError) {
-	if params == nil {
-		params = &ImportEmitParams{}
+	spec := requestSpec{
+		method: http.MethodPost,
+		path:   importPath(id) + "/emit",
 	}
-	return requestJSON[ImportJob](ctx, i.t, requestSpec{
-		method:   http.MethodPost,
-		path:     importPath(id) + "/emit",
-		jsonBody: params,
-	})
+	if params != nil {
+		spec.jsonBody = params
+	}
+	return requestJSON[ImportJob](ctx, i.t, spec)
 }
 
 func importRowQuery(params *ImportRowListParams) url.Values {

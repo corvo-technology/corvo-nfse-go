@@ -399,12 +399,12 @@ func TestAccountantPackage(t *testing.T) {
 
 func TestInvoicePackage(t *testing.T) {
 	var call capture
-	client := single(t, &call, http.StatusOK, `{"data": {"companyName": "ACME", "companyTaxId": "123", "month": "2026-10", "count": 4, "limit": 500, "total": 1234.5}}`)
+	client := single(t, &call, http.StatusOK, `{"data": {"companyName": "ACME", "companyTaxId": "123", "month": "2026-10", "count": 4, "limit": 500, "total": "1234.50"}}`)
 	summary, err := client.InvoicePackage.Summary(context.Background(), "co_1", "2026-10")
 	if err != nil {
 		t.Fatalf("invoicePackage.summary: %v", err)
 	}
-	if call.path != "/v1/companies/co_1/invoice-package/summary" || call.query != "month=2026-10" || summary.Count != 4 || summary.Total != 1234.5 {
+	if call.path != "/v1/companies/co_1/invoice-package/summary" || call.query != "month=2026-10" || summary.Count != 4 || summary.Total != "1234.50" {
 		t.Errorf("unexpected summary: %s ?%s %+v", call.path, call.query, summary)
 	}
 
@@ -574,8 +574,8 @@ func TestImports(t *testing.T) {
 		t.Errorf("imports.emit: %v %s %s %q", err, call.method, call.path, call.body)
 	}
 	_, _ = client.Imports.Emit(context.Background(), "imp_1", nil)
-	if call.body != `{}` {
-		t.Errorf("expected an empty object body, got %q", call.body)
+	if call.body != "" {
+		t.Errorf("expected no body, got %q", call.body)
 	}
 
 	_, _ = client.Imports.List(context.Background(), 5)

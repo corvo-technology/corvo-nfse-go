@@ -3859,16 +3859,6 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmitImport"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "202": {
             "content": {
@@ -3901,9 +3891,6 @@
                 "$ref": "#/components/headers/X-Request-Id"
               }
             }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error400"
           },
           "401": {
             "$ref": "#/components/responses/Error401"
@@ -6679,7 +6666,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InvoiceCalculation"
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/InvoiceCalculation"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
                 }
               }
             },
@@ -6932,6 +6927,188 @@
         ],
         "x-required-permissions": [
           "nfse.invoices.issue"
+        ]
+      }
+    },
+    "/plans": {
+      "get": {
+        "description": "The public price list, to show prices in your own pages. It needs no API key.",
+        "operationId": "plans_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from the previous page",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Billing cycle of the prices (default `monthly`; `annual` is discounted).",
+            "in": "query",
+            "name": "cycle",
+            "required": false,
+            "schema": {
+              "default": "monthly",
+              "enum": [
+                "monthly",
+                "annual"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/PlanPrice"
+                      },
+                      "type": "array"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/CursorPagination"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "pagination"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "security": [],
+        "summary": "List the paid plans and their prices",
+        "tags": [
+          "Credits and billing"
+        ]
+      }
+    },
+    "/plans/{slug}": {
+      "get": {
+        "description": "It needs no API key.",
+        "operationId": "plans_get",
+        "parameters": [
+          {
+            "description": "The plan: `solo`, `equipe`, `empresa` or `escala`.",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "enum": [
+                "free",
+                "self-hosted",
+                "solo",
+                "equipe",
+                "empresa",
+                "escala"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Billing cycle of the price (default `monthly`; `annual` is discounted).",
+            "in": "query",
+            "name": "cycle",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PlanPrice"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "security": [],
+        "summary": "Get the price of one paid plan",
+        "tags": [
+          "Credits and billing"
         ]
       }
     },
@@ -9166,24 +9343,31 @@
       "Company": {
         "properties": {
           "addressCity": {
+            "nullable": true,
             "type": "string"
           },
           "addressComplement": {
+            "nullable": true,
             "type": "string"
           },
           "addressDistrict": {
+            "nullable": true,
             "type": "string"
           },
           "addressNumber": {
+            "nullable": true,
             "type": "string"
           },
           "addressState": {
+            "nullable": true,
             "type": "string"
           },
           "addressStreet": {
+            "nullable": true,
             "type": "string"
           },
           "addressZip": {
+            "nullable": true,
             "type": "string"
           },
           "createdAt": {
@@ -9191,6 +9375,7 @@
             "type": "string"
           },
           "defaultServiceCode": {
+            "nullable": true,
             "type": "string"
           },
           "environment": {
@@ -9218,6 +9403,7 @@
             "type": "string"
           },
           "municipalReg": {
+            "nullable": true,
             "type": "string"
           },
           "sendMunicipalReg": {
@@ -9235,10 +9421,12 @@
           },
           "simplesIssRate": {
             "description": "Percent, e.g. \"2.00\".",
+            "nullable": true,
             "type": "string"
           },
           "simplesRate": {
             "description": "Percent, e.g. \"6.00\".",
+            "nullable": true,
             "type": "string"
           },
           "specialRegime": {
@@ -9262,7 +9450,8 @@
               "MEI",
               "Simples Nacional",
               "Lucro Presumido",
-              "Lucro Real"
+              "Lucro Real",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -9272,6 +9461,7 @@
             "type": "string"
           },
           "tradeName": {
+            "nullable": true,
             "type": "string"
           },
           "updatedAt": {
@@ -9647,7 +9837,8 @@
             "enum": [
               "NORMAL",
               "FIXED",
-              "EXEMPT"
+              "EXEMPT",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -9978,6 +10169,7 @@
         "properties": {
           "lastNumber": {
             "description": "The last DPS number used (0 when none yet).",
+            "format": "int64",
             "minimum": 0,
             "type": "integer"
           },
@@ -9995,15 +10187,6 @@
       "EmailOptions": {
         "properties": {
           "send": {
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "EmitImport": {
-        "properties": {
-          "sendEmail": {
-            "description": "Email each issued invoice to the customer. Only rows that have a customer email are sent.",
             "type": "boolean"
           }
         },
@@ -10056,7 +10239,8 @@
             "enum": [
               "SN",
               "ISS_MUNICIPAL",
-              "REGULAR"
+              "REGULAR",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -10076,7 +10260,8 @@
               "3",
               "4",
               "5",
-              "6"
+              "6",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -10890,7 +11075,8 @@
             "enum": [
               "issue_error",
               "service_not_provided",
-              "other"
+              "other",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -10924,14 +11110,19 @@
             "type": "string"
           },
           "customerSnapshot": {
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/CustomerSnapshot"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "nullable": true,
+                "type": "object"
               }
             ],
-            "description": "Null for anonymous consumer invoices (tomador omitted from the DPS).",
-            "nullable": true,
-            "type": "object"
+            "description": "Null for anonymous consumer invoices (tomador omitted from the DPS)."
           },
           "deduction": {
             "description": "Deduction from the ISS tax base declared by the issuer.",
@@ -10959,8 +11150,11 @@
             "type": "string"
           },
           "dpsNumber": {
+            "description": "The DPS number, a JSON integer (at most 15 digits, within the safe integer range of JavaScript). The leading zeros of the printed number are not kept.",
+            "format": "int64",
+            "minimum": 1,
             "nullable": true,
-            "type": "number"
+            "type": "integer"
           },
           "dpsSeries": {
             "nullable": true,
@@ -10980,7 +11174,8 @@
             "enum": [
               "queued",
               "sent",
-              "failed"
+              "failed",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -11027,7 +11222,8 @@
             "enum": [
               "queued",
               "sent",
-              "failed"
+              "failed",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -11046,14 +11242,18 @@
             "type": "string"
           },
           "nfseNumber": {
+            "description": "The NFS-e number, a JSON integer (at most 15 digits, within the safe integer range of JavaScript). The leading zeros of the printed number are not kept.",
+            "format": "int64",
+            "minimum": 1,
             "nullable": true,
-            "type": "number"
+            "type": "integer"
           },
           "portalFlag": {
             "description": "What the national portal reported after authorization (customer rejected the invoice, or the portal blocked it).",
             "enum": [
               "taker_rejected",
-              "blocked"
+              "blocked",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -11192,8 +11392,18 @@
             "type": "string"
           },
           "details": {
-            "description": "Field-level details, when the error has them.",
-            "type": "object"
+            "description": "Field-level details, when the error has them (a list of issues for validation errors).",
+            "oneOf": [
+              {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "object"
+              }
+            ]
           },
           "message": {
             "example": "Request validation failed",
@@ -11332,40 +11542,60 @@
       "InvoiceCalculation": {
         "properties": {
           "applicability": {
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/Applicability"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "nullable": true,
+                "type": "object"
               }
-            ],
-            "nullable": true,
-            "type": "object"
+            ]
           },
           "blocking": {
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/Blocking"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "nullable": true,
+                "type": "object"
               }
-            ],
-            "nullable": true,
-            "type": "object"
+            ]
           },
           "calculation": {
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/CalculationMetadata"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "nullable": true,
+                "type": "object"
               }
-            ],
-            "nullable": true,
-            "type": "object"
+            ]
           },
           "classification": {
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/Classification"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "nullable": true,
+                "type": "object"
               }
-            ],
-            "nullable": true,
-            "type": "object"
+            ]
           },
           "collectionWaived": {
             "nullable": true,
@@ -11412,7 +11642,8 @@
               "LUCRO_PRESUMIDO",
               "LUCRO_REAL",
               "OUTRO_REGIME",
-              "UNKNOWN"
+              "UNKNOWN",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -11566,7 +11797,8 @@
           },
           "source": {
             "enum": [
-              "portal"
+              "portal",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -11869,8 +12101,10 @@
             "type": "string"
           },
           "total": {
-            "description": "Sum of the amounts, in BRL.",
-            "type": "number"
+            "description": "Sum of the gross amount of the authorized notes, in BRL, as a decimal string with two places.",
+            "example": "1234.50",
+            "pattern": "^\\d+\\.\\d{2}$",
+            "type": "string"
           }
         },
         "required": [
@@ -11989,6 +12223,54 @@
           "active",
           "createdAt",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "PlanPrice": {
+        "properties": {
+          "basePriceCents": {
+            "description": "Full monthly price, in centavos.",
+            "type": "integer"
+          },
+          "chargeTotalCents": {
+            "description": "What is charged at once for the chosen cycle.",
+            "type": "integer"
+          },
+          "currency": {
+            "enum": [
+              "BRL"
+            ],
+            "type": "string"
+          },
+          "monthlyAllowance": {
+            "description": "Notes included per month.",
+            "type": "integer"
+          },
+          "monthlyEquivalentCents": {
+            "description": "Price per month in the chosen cycle (the annual cycle is discounted).",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "enum": [
+              "solo",
+              "equipe",
+              "empresa",
+              "escala"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "monthlyAllowance",
+          "basePriceCents",
+          "monthlyEquivalentCents",
+          "chargeTotalCents",
+          "currency"
         ],
         "type": "object"
       },
@@ -12300,7 +12582,8 @@
             "enum": [
               "WEEKLY",
               "BIWEEKLY",
-              "MONTHLY"
+              "MONTHLY",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -12332,7 +12615,8 @@
           "pause_reason": {
             "enum": [
               "customer",
-              "failures"
+              "failures",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -12601,7 +12885,8 @@
             "enum": [
               "NORMAL",
               "FIXED",
-              "EXEMPT"
+              "EXEMPT",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -12784,13 +13069,18 @@
       "UpdateCompany": {
         "properties": {
           "address": {
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/CompanyAddress"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "nullable": true,
+                "type": "object"
               }
-            ],
-            "nullable": true,
-            "type": "object"
+            ]
           },
           "defaultServiceCode": {
             "description": "Default cTribNac. Null removes the default; omission preserves it.",
@@ -12842,10 +13132,6 @@
               "5",
               "6"
             ],
-            "type": "string"
-          },
-          "taxId": {
-            "description": "The CNPJ cannot be changed. Sending the current CNPJ is accepted and ignored; any other value returns 422.",
             "type": "string"
           },
           "taxRegime": {
@@ -12973,7 +13259,8 @@
             "enum": [
               "NORMAL",
               "FIXED",
-              "EXEMPT"
+              "EXEMPT",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -13063,7 +13350,8 @@
           "simplesApuracao": {
             "description": "How a ME/EPP apportions federal and municipal taxes (DPS regApTribSN). Only SN (1) is supported; omit it for MEI. ISS_MUNICIPAL and REGULAR (above a sublimit) are refused.",
             "enum": [
-              "SN"
+              "SN",
+              null
             ],
             "example": "SN",
             "nullable": true,
@@ -13078,7 +13366,8 @@
               "3",
               "4",
               "5",
-              "6"
+              "6",
+              null
             ],
             "nullable": true,
             "type": "string"
@@ -13119,7 +13408,8 @@
             "description": "Set when an API key created it: it then only gets events of that environment.",
             "enum": [
               "test",
-              "live"
+              "live",
+              null
             ],
             "nullable": true,
             "type": "string"
