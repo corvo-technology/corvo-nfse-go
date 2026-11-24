@@ -17,8 +17,7 @@ func (p *Plans) List(ctx context.Context, params *ListParams) ([]PlanQuote, Pagi
 	return requestPage[PlanQuote](ctx, p.t, "/plans", listQuery(params))
 }
 
-// Get returns the price of one plan by slug (free, developer, growth, scale or
-// volume). GET /plans/:slug — unwrap "data".
+// Get returns the price of one plan by slug (an open string, for example free or solo). GET /plans/:slug — unwrap "data".
 func (p *Plans) Get(ctx context.Context, slug string) (PlanQuote, *CorvoError) {
 	return requestJSON[PlanQuote](ctx, p.t, requestSpec{
 		method: http.MethodGet,

@@ -2,6 +2,7 @@ package corvonfse
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 )
@@ -21,22 +22,54 @@ func invoiceListQuery(params *InvoiceListParams) url.Values {
 	queryAdd(query, "from", params.From)
 	queryAdd(query, "to", params.To)
 	queryAdd(query, "externalId", params.ExternalID)
+	queryAdd(query, "customerTaxId", params.CustomerTaxID)
 	queryAddInt(query, "limit", params.Limit)
 	queryAdd(query, "cursor", params.Cursor)
 	return query
 }
 
-// Create issues an invoice. Pass a non-empty idempotencyKey to safely
-// retry: the same key returns the first created invoice.
+// Create issues an invoice, or schedules one. Pass a non-empty idempotencyKey
+// to safely retry: the same key returns the first result.
 //
-// POST /invoices — unwrap "data". Returns 202 while the invoice is queued.
-func (i *Invoices) Create(ctx context.Context, params InvoiceCreateParams, idempotencyKey string) (Invoice, *CorvoError) {
-	return requestJSON[Invoice](ctx, i.t, requestSpec{
+// With Options.Type IMMEDIATE (the default) the result has Invoice set (status
+// "queued"). With SCHEDULE or RECURRING no invoice exists yet: the result has
+// Schedule set, and the note is issued when the schedule runs (follow it with
+// Schedules.ListRuns).
+//
+// POST /invoices — unwrap "data". Returns 202.
+func (i *Invoices) Create(ctx context.Context, params InvoiceCreateParams, idempotencyKey string) (InvoiceCreateResult, *CorvoError) {
+	var result InvoiceCreateResult
+	raw, cerr := requestJSON[json.RawMessage](ctx, i.t, requestSpec{
 		method:         http.MethodPost,
 		path:           "/invoices",
 		jsonBody:       params,
 		idempotencyKey: idempotencyKey,
 	})
+	if cerr != nil {
+		return result, cerr
+	}
+	if len(raw) == 0 {
+		return result, nil
+	}
+	// A schedule answers in snake_case with anchor_on; an invoice never has it.
+	var probe struct {
+		AnchorOn *string `json:"anchor_on"`
+	}
+	_ = json.Unmarshal(raw, &probe)
+	if probe.AnchorOn != nil {
+		var schedule Schedule
+		if err := json.Unmarshal(raw, &schedule); err != nil {
+			return result, invalidJSON(http.StatusAccepted, "")
+		}
+		result.Schedule = &schedule
+		return result, nil
+	}
+	var invoice Invoice
+	if err := json.Unmarshal(raw, &invoice); err != nil {
+		return result, invalidJSON(http.StatusAccepted, "")
+	}
+	result.Invoice = &invoice
+	return result, nil
 }
 
 // CreateBatch issues 1 to 50 invoices in one call, for one company or several.
@@ -121,13 +154,56 @@ func (i *Invoices) DownloadURL(ctx context.Context, id string, format DownloadFo
 	})
 }
 
-// SendEmail requests (re)delivery of the invoice e-mail. Pass a non-empty
+// SendEmail requests (re)delivery of the invoice e-mail. params is optional:
+// set Email to send to another address than the customer's. Pass a non-empty
 // idempotencyKey to safely retry. POST /invoices/:id/email — unwrap "data".
-func (i *Invoices) SendEmail(ctx context.Context, id string, idempotencyKey string) (InvoiceEmailResult, *CorvoError) {
-	return requestJSON[InvoiceEmailResult](ctx, i.t, requestSpec{
+func (i *Invoices) SendEmail(ctx context.Context, id string, params *InvoiceEmailParams, idempotencyKey string) (InvoiceEmailResult, *CorvoError) {
+	spec := requestSpec{
 		method:         http.MethodPost,
 		path:           "/invoices/" + url.PathEscape(id) + "/email",
 		idempotencyKey: idempotencyKey,
+	}
+	if params != nil {
+		spec.jsonBody = params
+	}
+	return requestJSON[InvoiceEmailResult](ctx, i.t, spec)
+}
+
+// Substitute replaces an authorized invoice with a corrected one: only the
+// description (why), service.description, purchaseOrder and notes can change.
+// The result is the new invoice, queued. Pass a non-empty idempotencyKey to
+// safely retry. POST /invoices/:id/substitute — unwrap "data". Returns 202.
+func (i *Invoices) Substitute(ctx context.Context, id string, params InvoiceSubstituteParams, idempotencyKey string) (Invoice, *CorvoError) {
+	return requestJSON[Invoice](ctx, i.t, requestSpec{
+		method:         http.MethodPost,
+		path:           "/invoices/" + url.PathEscape(id) + "/substitute",
+		jsonBody:       params,
+		idempotencyKey: idempotencyKey,
+	})
+}
+
+// Review resolves invoices in manual_review (up to 100): retry sends them
+// again with the same DPS, discard rejects them once the portal confirms the
+// DPS was never registered. Invoices not in manual review are skipped.
+// POST /invoices/review — unwrap "data". Returns 202.
+func (i *Invoices) Review(ctx context.Context, params InvoiceReviewParams) (InvoiceReviewResult, *CorvoError) {
+	return requestJSON[InvoiceReviewResult](ctx, i.t, requestSpec{
+		method:   http.MethodPost,
+		path:     "/invoices/review",
+		jsonBody: params,
+	})
+}
+
+// Overview returns the invoice counters, the daily activity and the recent
+// invoices of the window (OverviewPeriod7d by default, or OverviewPeriod30d).
+// GET /invoices/overview — unwrap "data".
+func (i *Invoices) Overview(ctx context.Context, period InvoiceOverviewPeriod) (InvoiceOverview, *CorvoError) {
+	query := url.Values{}
+	queryAdd(query, "period", string(period))
+	return requestJSON[InvoiceOverview](ctx, i.t, requestSpec{
+		method: http.MethodGet,
+		path:   "/invoices/overview",
+		query:  query,
 	})
 }
 

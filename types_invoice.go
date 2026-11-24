@@ -42,6 +42,7 @@ const (
 	InvoiceStageDocumentsReady InvoiceStage = "documents_ready"
 	InvoiceStageCompleted      InvoiceStage = "completed"
 	InvoiceStageFailed         InvoiceStage = "failed"
+	InvoiceStageCancelled      InvoiceStage = "cancelled"
 )
 
 // DownloadFormat selects the binary format for Invoices.DownloadURL.
@@ -52,24 +53,43 @@ const (
 	FormatXML DownloadFormat = "xml"
 )
 
-// InvoiceCustomerInput is the customer (tomador) of an invoice. When a
-// customer is sent, TaxID (CPF or CNPJ) is required; omit the customer for an
-// invoice without one.
+// InvoiceCustomerInput is the customer (tomador) of an invoice. Send TaxID
+// (CPF or CNPJ) for a Brazilian customer, or Foreign for a customer outside
+// Brazil (it cannot be combined with TaxID or Address, and Name is then
+// required). Omit the customer for an invoice without one. Name may be left
+// empty when the customer was already saved: it is filled from the CPF/CNPJ.
 type InvoiceCustomerInput struct {
-	TaxID   string                  `json:"taxId"`
+	TaxID   string                  `json:"taxId,omitempty"`
 	Name    string                  `json:"name,omitempty"`
 	Email   string                  `json:"email,omitempty"`
 	Address *InvoiceCustomerAddress `json:"address,omitempty"`
+	Foreign *ForeignCustomer        `json:"foreign,omitempty"`
 }
 
 // InvoiceCustomerAddress is the optional customer address. All fields are
 // optional; empty fields are omitted from the request.
 type InvoiceCustomerAddress struct {
-	Street  string `json:"street,omitempty"`
-	City    string `json:"city,omitempty"`
-	State   string `json:"state,omitempty"`
-	Zip     string `json:"zip,omitempty"`
-	Country string `json:"country,omitempty"`
+	Street           string `json:"street,omitempty"`
+	City             string `json:"city,omitempty"`
+	State            string `json:"state,omitempty"`
+	Zip              string `json:"zip,omitempty"`
+	Country          string `json:"country,omitempty"`
+	MunicipalityCode string `json:"municipalityCode,omitempty"`
+}
+
+// ForeignCustomer is a customer outside Brazil. Identify it with TaxID or with
+// NoTaxIDReason ("exempt" or "not_required").
+type ForeignCustomer struct {
+	TaxID         string `json:"taxId,omitempty"`
+	NoTaxIDReason string `json:"noTaxIdReason,omitempty"`
+	Country       string `json:"country"`
+	PostalCode    string `json:"postalCode"`
+	City          string `json:"city"`
+	Region        string `json:"region"`
+	Street        string `json:"street"`
+	Number        string `json:"number"`
+	District      string `json:"district"`
+	Complement    string `json:"complement,omitempty"`
 }
 
 // InvoiceServiceInput describes the service. All fields are optional: Code
@@ -80,22 +100,56 @@ type InvoiceServiceInput struct {
 	Code             string `json:"code,omitempty"`
 	MunicipalityCode string `json:"municipalityCode,omitempty"`
 	Description      string `json:"description,omitempty"`
+	// ServiceProfileID picks a service tax profile of the company.
+	ServiceProfileID string `json:"serviceProfileId,omitempty"`
+	// Fiscal overrides the tax classification of the service.
+	Fiscal *ServiceFiscal `json:"fiscal,omitempty"`
 }
 
-// InvoiceType selects immediate or scheduled issuance.
+// ServiceFiscal is the optional tax classification of a service.
+type ServiceFiscal struct {
+	ClassCode          string `json:"classCode,omitempty"`
+	CST                string `json:"cst,omitempty"`
+	NBSCode            string `json:"nbsCode,omitempty"`
+	OperationIndicator string `json:"operationIndicator,omitempty"`
+}
+
+// InvoiceType selects immediate, scheduled or recurring issuance.
 type InvoiceType string
 
 const (
 	InvoiceTypeImmediate InvoiceType = "IMMEDIATE"
-	InvoiceTypeSchedule  InvoiceType = "SCHEDULE"
+	// InvoiceTypeSchedule creates a Schedule that issues the invoice once, on
+	// CompetenceDate (from tomorrow, up to 15 days ahead).
+	InvoiceTypeSchedule InvoiceType = "SCHEDULE"
+	// InvoiceTypeRecurring creates a Schedule that issues on Recurrence
+	// (CompetenceDate is the first run, up to 31 days ahead).
+	InvoiceTypeRecurring InvoiceType = "RECURRING"
 )
 
+// RecurrenceFrequency is how often a recurring schedule runs.
+type RecurrenceFrequency string
+
+const (
+	FrequencyWeekly   RecurrenceFrequency = "WEEKLY"
+	FrequencyBiweekly RecurrenceFrequency = "BIWEEKLY"
+	FrequencyMonthly  RecurrenceFrequency = "MONTHLY"
+)
+
+// InvoiceRecurrence is required for InvoiceTypeRecurring and refused
+// otherwise. EndsOn (YYYY-MM-DD) is optional.
+type InvoiceRecurrence struct {
+	Frequency RecurrenceFrequency `json:"frequency"`
+	EndsOn    string              `json:"endsOn,omitempty"`
+}
+
 // InvoiceCreateOptions are the optional emission knobs accepted by
-// Invoices.Create. Type SCHEDULE with a future CompetenceDate schedules the
-// issuance (up to 15 days ahead by default).
+// Invoices.Create. Type SCHEDULE or RECURRING does not issue an invoice: the
+// API answers with a Schedule (see InvoiceCreateResult).
 type InvoiceCreateOptions struct {
-	Email *InvoiceEmailOption `json:"email,omitempty"`
-	Type  InvoiceType         `json:"type,omitempty"`
+	Email      *InvoiceEmailOption `json:"email,omitempty"`
+	Type       InvoiceType         `json:"type,omitempty"`
+	Recurrence *InvoiceRecurrence  `json:"recurrence,omitempty"`
 }
 
 // InvoiceEmailOption controls whether the NFS-e e-mail is sent.
@@ -128,6 +182,23 @@ type InvoiceCreateParams struct {
 	// Options.Email.Send wins when set.
 	Email   *bool                 `json:"email,omitempty"`
 	Options *InvoiceCreateOptions `json:"options,omitempty"`
+	// PurchaseOrder is the purchase order number (up to 60 characters, DPS xPed).
+	PurchaseOrder string `json:"purchaseOrder,omitempty"`
+	// Notes is additional information (up to 2000 characters, DPS xInfComp).
+	Notes string `json:"notes,omitempty"`
+}
+
+// InvoiceCreateResult is the answer of Invoices.Create: an Invoice for an
+// IMMEDIATE emission, or a Schedule for SCHEDULE and RECURRING. Exactly one of
+// the two is set.
+type InvoiceCreateResult struct {
+	Invoice  *Invoice
+	Schedule *Schedule
+}
+
+// IsSchedule reports whether the API created a schedule instead of an invoice.
+func (r InvoiceCreateResult) IsSchedule() bool {
+	return r.Schedule != nil
 }
 
 // InvoiceListParams are the filters accepted by Invoices.List and
@@ -138,8 +209,10 @@ type InvoiceListParams struct {
 	From       string
 	To         string
 	ExternalID string
-	Limit      int
-	Cursor     string
+	// CustomerTaxID filters by the customer CPF or CNPJ (digits).
+	CustomerTaxID string
+	Limit         int
+	Cursor        string
 }
 
 // Invoice is a fiscal invoice. Nullable server fields map to their zero
@@ -160,30 +233,36 @@ type Invoice struct {
 	TaxSnapshot        map[string]any          `json:"taxSnapshot"`
 	Amount             float64                 `json:"amount"`
 	// Discount and Deduction are set only when declared on the invoice.
-	Discount            *float64     `json:"discount,omitempty"`
-	Deduction           *float64     `json:"deduction,omitempty"`
-	Currency            string       `json:"currency"`
-	CompetenceDate      string       `json:"competenceDate"`
-	DPSID               string       `json:"dpsId"`
-	DPSSeries           string       `json:"dpsSeries"`
-	DPSNumber           int          `json:"dpsNumber"`
-	AccessKey           string       `json:"accessKey"`
-	NFSENumber          int          `json:"nfseNumber"`
-	FiscalProvider      string       `json:"fiscalProvider"`
-	FiscalSchemaVersion string       `json:"fiscalSchemaVersion"`
-	IssuedAt            string       `json:"issuedAt"`
-	AuthorizedAt        string       `json:"authorizedAt"`
-	LastErrorCode       string       `json:"lastErrorCode"`
-	LastErrorMessage    string       `json:"lastErrorMessage"`
-	LastErrorProvider   string       `json:"lastErrorProvider"`
-	DocumentsReadyAt    string       `json:"documentsReadyAt"`
-	LastEmailStatus     string       `json:"lastEmailStatus"`
-	LastEmailSentAt     string       `json:"lastEmailSentAt"`
-	CreatedAt           string       `json:"createdAt"`
-	UpdatedAt           string       `json:"updatedAt"`
-	DocumentsStatus     string       `json:"documentsStatus"`
-	EmailStatus         string       `json:"emailStatus"`
-	Stage               InvoiceStage `json:"stage"`
+	Discount            *float64 `json:"discount,omitempty"`
+	Deduction           *float64 `json:"deduction,omitempty"`
+	Currency            string   `json:"currency"`
+	CompetenceDate      string   `json:"competenceDate"`
+	DPSID               string   `json:"dpsId"`
+	DPSSeries           string   `json:"dpsSeries"`
+	DPSNumber           int      `json:"dpsNumber"`
+	AccessKey           string   `json:"accessKey"`
+	NFSENumber          int      `json:"nfseNumber"`
+	FiscalProvider      string   `json:"fiscalProvider"`
+	FiscalSchemaVersion string   `json:"fiscalSchemaVersion"`
+	IssuedAt            string   `json:"issuedAt"`
+	AuthorizedAt        string   `json:"authorizedAt"`
+	LastErrorCode       string   `json:"lastErrorCode"`
+	LastErrorMessage    string   `json:"lastErrorMessage"`
+	LastErrorProvider   string   `json:"lastErrorProvider"`
+	DocumentsReadyAt    string   `json:"documentsReadyAt"`
+	// SubstitutesInvoiceID and SubstitutionDescription are set on an invoice
+	// that substitutes another one.
+	SubstitutesInvoiceID    string `json:"substitutesInvoiceId"`
+	SubstitutionDescription string `json:"substitutionDescription"`
+	// PortalFlag is "taker_rejected" or "blocked" (from the national portal).
+	PortalFlag      string       `json:"portalFlag"`
+	LastEmailStatus string       `json:"lastEmailStatus"`
+	LastEmailSentAt string       `json:"lastEmailSentAt"`
+	CreatedAt       string       `json:"createdAt"`
+	UpdatedAt       string       `json:"updatedAt"`
+	DocumentsStatus string       `json:"documentsStatus"`
+	EmailStatus     string       `json:"emailStatus"`
+	Stage           InvoiceStage `json:"stage"`
 	// ScheduledFor is when a scheduled invoice is released (ISO); empty for an
 	// immediate one.
 	ScheduledFor string `json:"scheduledFor"`
@@ -250,13 +329,18 @@ type InvoiceCustomerSnapshot struct {
 	Email   string                  `json:"email"`
 	TaxID   string                  `json:"taxId"`
 	Address *InvoiceCustomerAddress `json:"address"`
+	Foreign map[string]string       `json:"foreign"`
 }
 
 // InvoiceServiceSnapshot is the serviced item frozen at emission time.
 type InvoiceServiceSnapshot struct {
-	Code             string `json:"code"`
-	Description      string `json:"description"`
-	MunicipalityCode string `json:"municipalityCode"`
+	Code             string            `json:"code"`
+	Description      string            `json:"description"`
+	MunicipalityCode string            `json:"municipalityCode"`
+	Fiscal           map[string]string `json:"fiscal"`
+	Notes            string            `json:"notes"`
+	PurchaseOrder    string            `json:"purchaseOrder"`
+	ServiceProfileID string            `json:"serviceProfileId"`
 }
 
 // InvoiceEvent is a status transition recorded for an invoice.
@@ -266,7 +350,12 @@ type InvoiceEvent struct {
 	FromStatus InvoiceStatus `json:"fromStatus"`
 	ToStatus   InvoiceStatus `json:"toStatus"`
 	Reason     string        `json:"reason"`
-	CreatedAt  string        `json:"createdAt"`
+	// Source is "portal" for an event reported by the national portal, empty
+	// otherwise; PortalEvent and PortalNsu then identify it.
+	Source      string `json:"source"`
+	PortalEvent string `json:"portalEvent"`
+	PortalNsu   string `json:"portalNsu"`
+	CreatedAt   string `json:"createdAt"`
 }
 
 // InvoiceDownloadUrl is a short-lived signed URL for an invoice document.
@@ -275,6 +364,90 @@ type InvoiceDownloadUrl struct {
 	ExpiresAt   string `json:"expiresAt"`
 	FileName    string `json:"fileName"`
 	MimeType    string `json:"mimeType"`
+}
+
+// InvoiceEmailParams are the optional fields of Invoices.SendEmail. Email
+// sends the invoice to another address than the customer's.
+type InvoiceEmailParams struct {
+	Email string `json:"email,omitempty"`
+}
+
+// InvoiceSubstituteParams are the fields accepted by Invoices.Substitute: only
+// the reason, the service description, the purchase order and the notes can
+// change in a substitute.
+type InvoiceSubstituteParams struct {
+	// Description is why the invoice is being substituted (required).
+	Description   string                    `json:"description"`
+	Service       *InvoiceSubstituteService `json:"service,omitempty"`
+	PurchaseOrder string                    `json:"purchaseOrder,omitempty"`
+	Notes         string                    `json:"notes,omitempty"`
+}
+
+// InvoiceSubstituteService is the part of the service a substitute may change.
+type InvoiceSubstituteService struct {
+	Description string `json:"description,omitempty"`
+}
+
+// InvoiceReviewAction is what Invoices.Review does with invoices in manual
+// review.
+type InvoiceReviewAction string
+
+const (
+	ReviewRetry   InvoiceReviewAction = "retry"
+	ReviewDiscard InvoiceReviewAction = "discard"
+)
+
+// InvoiceReviewParams are the fields accepted by Invoices.Review (up to 100
+// invoice ids).
+type InvoiceReviewParams struct {
+	Action     InvoiceReviewAction `json:"action"`
+	InvoiceIDs []string            `json:"invoiceIds"`
+}
+
+// InvoiceReviewItem is the outcome for one invoice of Invoices.Review.
+// Outcome is "accepted" or "skipped"; Reason is set when skipped (not_found,
+// not_in_manual_review or changed).
+type InvoiceReviewItem struct {
+	ID      string `json:"id"`
+	Outcome string `json:"outcome"`
+	Reason  string `json:"reason"`
+}
+
+// InvoiceReviewResult is the answer of Invoices.Review.
+type InvoiceReviewResult struct {
+	Results []InvoiceReviewItem `json:"results"`
+}
+
+// InvoiceOverviewPeriod is the window of Invoices.Overview.
+type InvoiceOverviewPeriod string
+
+const (
+	OverviewPeriod7d  InvoiceOverviewPeriod = "7d"
+	OverviewPeriod30d InvoiceOverviewPeriod = "30d"
+)
+
+// OverviewCounts are the invoice counters of the overview.
+type OverviewCounts struct {
+	Authorized int `json:"authorized"`
+	Processing int `json:"processing"`
+	Rejected   int `json:"rejected"`
+}
+
+// OverviewDay is the number of invoices authorized on one day.
+type OverviewDay struct {
+	Count int    `json:"count"`
+	Date  string `json:"date"`
+}
+
+// InvoiceOverview is the answer of Invoices.Overview.
+type InvoiceOverview struct {
+	Counts         OverviewCounts        `json:"counts"`
+	DailyActivity  []OverviewDay         `json:"dailyActivity"`
+	From           string                `json:"from"`
+	Period         InvoiceOverviewPeriod `json:"period"`
+	RecentInvoices []Invoice             `json:"recentInvoices"`
+	Timezone       string                `json:"timezone"`
+	To             string                `json:"to"`
 }
 
 // InvoiceEmailResult acknowledges an e-mail send request.

@@ -154,16 +154,19 @@ func TestHealthLiveReturnsRawObject(t *testing.T) {
 }
 
 func TestVersionAndWebhookEvents(t *testing.T) {
-	if corvonfse.Version != "0.2.0" {
-		t.Errorf("expected Version 0.2.0, got %q", corvonfse.Version)
+	if corvonfse.Version != "0.3.0" {
+		t.Errorf("expected Version 0.3.0, got %q", corvonfse.Version)
 	}
-	if len(corvonfse.WebhookEvents) != 11 {
-		t.Fatalf("expected 11 webhook events, got %d", len(corvonfse.WebhookEvents))
+	if len(corvonfse.WebhookEvents) != 12 {
+		t.Fatalf("expected 12 webhook events, got %d", len(corvonfse.WebhookEvents))
 	}
 	if corvonfse.WebhookEvents[8] != "nfse.invoice.fiscal_discrepancy" {
 		t.Errorf("expected event 9 nfse.invoice.fiscal_discrepancy, got %q", corvonfse.WebhookEvents[8])
 	}
 	if corvonfse.WebhookEvents[10] != "nfse.invoice.cancellation_rejected" {
-		t.Errorf("expected last event nfse.invoice.cancellation_rejected, got %q", corvonfse.WebhookEvents[10])
+		t.Errorf("expected event 11 nfse.invoice.cancellation_rejected, got %q", corvonfse.WebhookEvents[10])
+	}
+	if corvonfse.WebhookEvents[11] != "nfse.invoice.taker_rejected" {
+		t.Errorf("expected last event nfse.invoice.taker_rejected, got %q", corvonfse.WebhookEvents[11])
 	}
 }

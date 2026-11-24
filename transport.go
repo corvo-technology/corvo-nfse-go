@@ -132,6 +132,11 @@ func queryAddInt(q url.Values, key string, value int) {
 	}
 }
 
+// joinComma joins values with commas (for comma-separated query parameters).
+func joinComma(values []string) string {
+	return strings.Join(values, ",")
+}
+
 // do executes the request and maps failures to *CorvoError. On success the
 // caller owns resp.Body and must close it.
 func (t *Transport) do(ctx context.Context, spec requestSpec) (*http.Response, *CorvoError) {
@@ -174,6 +179,7 @@ func (t *Transport) do(ctx context.Context, spec requestSpec) (*http.Response, *
 	}
 	req.Header.Set("X-API-Key", t.apiKey)
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "corvo-nfse-go/"+Version)
 	if spec.contentType != "" {
 		req.Header.Set("Content-Type", spec.contentType)
 	} else if spec.jsonBody != nil {
@@ -227,7 +233,7 @@ func toError(resp *http.Response) *CorvoError {
 		Code       string          `json:"code"`
 		Message    json.RawMessage `json:"message"`
 		Error      string          `json:"error"`
-		Details    []Detail        `json:"details"`
+		Details    json.RawMessage `json:"details"`
 		RequestID  string          `json:"requestId"`
 		RetryAfter *int            `json:"retryAfter"`
 	}
@@ -264,10 +270,24 @@ func toError(resp *http.Response) *CorvoError {
 		Status:     resp.StatusCode,
 		Code:       code,
 		Message:    message,
-		Details:    parsed.Details,
+		Details:    decodeErrorDetails(parsed.Details),
 		RequestID:  requestID,
 		RetryAfter: retryAfter,
 	}
+}
+
+// decodeErrorDetails reads the field-level details of an error body. The
+// contract allows an array of { field, code, message } or a free-form object;
+// only the array form is exposed, anything else yields nil.
+func decodeErrorDetails(raw json.RawMessage) []Detail {
+	if len(raw) == 0 {
+		return nil
+	}
+	var details []Detail
+	if err := json.Unmarshal(raw, &details); err != nil {
+		return nil
+	}
+	return details
 }
 
 // decodeErrorMessage accepts a string or an array of strings from the
@@ -377,9 +397,14 @@ func requestJSON[T any](ctx context.Context, t *Transport, spec requestSpec) (T,
 // requestFile performs a GET and returns the raw bytes plus the mime type
 // and file name advertised in the response headers.
 func requestFile(ctx context.Context, t *Transport, method, path string) (DownloadedFile, *CorvoError) {
+	return requestFileQuery(ctx, t, method, path, nil)
+}
+
+// requestFileQuery is requestFile with query parameters.
+func requestFileQuery(ctx context.Context, t *Transport, method, path string, query url.Values) (DownloadedFile, *CorvoError) {
 	var out DownloadedFile
 
-	resp, cerr := t.do(ctx, requestSpec{method: method, path: path})
+	resp, cerr := t.do(ctx, requestSpec{method: method, path: path, query: query})
 	if cerr != nil {
 		return out, cerr
 	}

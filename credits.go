@@ -3,6 +3,8 @@ package corvonfse
 import (
 	"context"
 	"net/http"
+	"net/url"
+	"strconv"
 )
 
 // Credits reports the tenant credit balance, purchasable plans and the
@@ -36,4 +38,17 @@ func (c *Credits) History(ctx context.Context, params *ListParams) ([]CreditTran
 // including the first — is returned as *CorvoError.
 func (c *Credits) IterateHistory(ctx context.Context, params *ListParams, fn func(CreditTransaction) bool) *CorvoError {
 	return iteratePages[CreditTransaction](ctx, c.t, "/credits/history", listQuery(params), fn)
+}
+
+// PreviewPurchase prices a one-off purchase of units loose notes (R$ 0,99
+// each, at least 3, whole numbers) without buying: buying is done in the
+// dashboard. GET /credits/purchase/preview — unwrap "data".
+func (c *Credits) PreviewPurchase(ctx context.Context, units int) (PurchasePreview, *CorvoError) {
+	query := url.Values{}
+	query.Set("units", strconv.Itoa(units))
+	return requestJSON[PurchasePreview](ctx, c.t, requestSpec{
+		method: http.MethodGet,
+		path:   "/credits/purchase/preview",
+		query:  query,
+	})
 }
