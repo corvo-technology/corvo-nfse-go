@@ -7,7 +7,7 @@ import (
 )
 
 // Version is the SDK version.
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 // Options configures NewClient.
 //
@@ -40,14 +40,28 @@ type Options struct {
 // the zero value. The SDK never panics for API, network or timeout
 // failures — only NewClient panics, and only on misconfiguration.
 type Client struct {
-	Billing      *Billing
-	Certificates *Certificates
-	Companies    *Companies
-	Credits      *Credits
-	Health       *Health
-	Invoices     *Invoices
-	Plans        *Plans
-	Webhooks     *Webhooks
+	AccountantPackage      *AccountantPackage
+	Billing                *Billing
+	Certificates           *Certificates
+	CNPJ                   *CNPJ
+	Companies              *Companies
+	Credits                *Credits
+	Customers              *Customers
+	DPSSequence            *DPSSequence
+	FiscalPortal           *FiscalPortal
+	FiscalProfiles         *FiscalProfiles
+	Health                 *Health
+	Imports                *Imports
+	IntegrationConnections *IntegrationConnections
+	IntegrationOperations  *IntegrationOperations
+	Integrations           *Integrations
+	InvoicePackage         *InvoicePackage
+	Invoices               *Invoices
+	Plans                  *Plans
+	Schedules              *Schedules
+	ServiceFavorites       *ServiceFavorites
+	ServiceTaxProfiles     *ServiceTaxProfiles
+	Webhooks               *Webhooks
 }
 
 // NewClient builds a Client from opts, falling back to the CORVO_API_KEY
@@ -88,13 +102,27 @@ func NewClient(opts Options) *Client {
 	)
 
 	return &Client{
-		Billing:      &Billing{t: transport},
-		Certificates: &Certificates{t: transport},
-		Companies:    &Companies{t: transport},
-		Credits:      &Credits{t: transport},
-		Health:       &Health{t: transport},
-		Invoices:     &Invoices{t: transport},
-		Plans:        &Plans{t: transport},
-		Webhooks:     newWebhooks(transport),
+		AccountantPackage:      &AccountantPackage{t: transport},
+		Billing:                &Billing{t: transport},
+		Certificates:           &Certificates{t: transport},
+		CNPJ:                   &CNPJ{t: transport},
+		Companies:              &Companies{t: transport},
+		Credits:                &Credits{t: transport},
+		Customers:              &Customers{t: transport},
+		DPSSequence:            &DPSSequence{t: transport},
+		FiscalPortal:           &FiscalPortal{t: transport},
+		FiscalProfiles:         &FiscalProfiles{t: transport},
+		Health:                 &Health{t: transport},
+		Imports:                &Imports{t: transport},
+		IntegrationConnections: &IntegrationConnections{t: transport},
+		IntegrationOperations:  &IntegrationOperations{t: transport},
+		Integrations:           &Integrations{t: transport},
+		InvoicePackage:         &InvoicePackage{t: transport},
+		Invoices:               &Invoices{t: transport},
+		Plans:                  &Plans{t: transport},
+		Schedules:              &Schedules{t: transport},
+		ServiceFavorites:       &ServiceFavorites{t: transport},
+		ServiceTaxProfiles:     &ServiceTaxProfiles{t: transport},
+		Webhooks:               newWebhooks(transport),
 	}
 }

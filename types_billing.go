@@ -12,6 +12,8 @@ type BillingPlanResponse struct {
 
 // BillingPlan is the plan descriptor. Fields use snake_case wire names.
 type BillingPlan struct {
+	// Slug is an open string: free, self-hosted, solo, equipe, empresa or escala
+	// today. Do not hard-code the list.
 	Slug               string `json:"slug"`
 	Name               string `json:"name"`
 	MonthlyAllowance   int    `json:"monthly_allowance"`
@@ -28,13 +30,29 @@ type BillingSubscription struct {
 	CancelAtPeriodEnd bool   `json:"cancel_at_period_end"`
 	ScheduledPlan     string `json:"scheduled_plan"`
 	Blocked           bool   `json:"blocked"`
+	// StripePortalAvailable is true when the customer portal can be opened.
+	StripePortalAvailable bool `json:"stripe_portal_available"`
+	// StripeSubscription is true when the subscription is billed by Stripe.
+	StripeSubscription bool `json:"stripe_subscription"`
+	// PixSubscription is the Pix subscription, or nil when there is none.
+	PixSubscription *BillingPixSubscription `json:"pix_subscription"`
+}
+
+// BillingPixSubscription is the Pix subscription of the workspace.
+type BillingPixSubscription struct {
+	BrCode         string `json:"brCode"`
+	PaymentID      string `json:"paymentId"`
+	PaymentLinkURL string `json:"paymentLinkUrl"`
+	PlanSlug       string `json:"planSlug"`
+	// Status is "active" or "pending".
+	Status string `json:"status"`
 }
 
 // BillingUsage is the usage block of the plan response. Fields use
 // snake_case wire names.
 type BillingUsage struct {
-	OverageUnits       int    `json:"overage_units"`
-	OverageAmountCents int    `json:"overage_amount_cents"`
+	// AvulsoBalance is the loose notes bought separately.
+	AvulsoBalance      int    `json:"avulso_balance"`
 	HardLimit          int    `json:"hard_limit"`
 	CreditsUsed        int    `json:"credits_used"`
 	CreditsReserved    int    `json:"credits_reserved"`

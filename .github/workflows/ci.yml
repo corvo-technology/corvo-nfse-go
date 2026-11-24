@@ -10,7 +10,30 @@ permissions:
 
 jobs:
   build:
-    name: Build, vet, test, lint
+    name: Build, vet, test (Go ${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.22.x", "1.23.x", "stable"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test (covers every operation of spec/openapi.json)
+        run: go test -race ./...
+
+  lint:
+    name: Format and lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,14 +42,12 @@ jobs:
         with:
           go-version: "1.22.x"
 
-      - name: Build
-        run: go build ./...
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Test
-        run: go test ./...
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Run gofmt -w on:"; echo "$unformatted"; exit 1
+          fi
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
@@ -38,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     # Runs only when the live-instance secrets are configured.
     if: ${{ vars.CORVO_BASE_URL != '' }}
-    needs: build
+    needs: [build, lint]
     steps:
       - uses: actions/checkout@v4
 

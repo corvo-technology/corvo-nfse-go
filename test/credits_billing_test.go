@@ -13,10 +13,9 @@ func TestCreditsBalance(t *testing.T) {
 	client, _ := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		call = record(r)
 		writeJSON(w, http.StatusOK, `{"data": {
-			"tenantId": "tenant_1",
 			"balance": 200,
-			"overageUnits": 0,
-			"overageAmountCents": 0,
+			"planRemaining": 150,
+			"avulsoBalance": 50,
 			"hardLimit": 1000
 		}}`)
 	}))
@@ -28,7 +27,7 @@ func TestCreditsBalance(t *testing.T) {
 	if call.path != "/v1/credits" {
 		t.Errorf("expected path /v1/credits, got %s", call.path)
 	}
-	if balance.Balance != 200 || balance.HardLimit != 1000 {
+	if balance.Balance != 200 || balance.PlanRemaining != 150 || balance.AvulsoBalance != 50 || balance.HardLimit != 1000 {
 		t.Errorf("expected balance decoded, got %+v", balance)
 	}
 }
@@ -40,7 +39,7 @@ func TestCreditsPlansUnwrapsPropsItems(t *testing.T) {
 		}
 		writeJSON(w, http.StatusOK, `{
 			"data": [{
-				"id": "plan_1", "slug": "start", "name": "Start",
+				"id": "plan_1", "slug": "equipe", "name": "Equipe",
 				"dailyLimit": 300, "creditUnitPriceCents": 7,
 				"supportTier": "standard", "active": true
 			}],
@@ -52,7 +51,7 @@ func TestCreditsPlansUnwrapsPropsItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("credits.plans: %v", err)
 	}
-	if len(plans) != 1 || plans[0].Slug != "start" || plans[0].CreditUnitPriceCents != 7 {
+	if len(plans) != 1 || plans[0].Slug != "equipe" || plans[0].CreditUnitPriceCents != 7 {
 		t.Errorf("expected plan decoded, got %+v", plans)
 	}
 }
@@ -97,15 +96,17 @@ func TestBillingPlanUsesSnakeCaseWireNames(t *testing.T) {
 		call = record(r)
 		writeJSON(w, http.StatusOK, `{"data": {
 			"plan": {
-				"slug": "start", "name": "Start", "monthly_allowance": 300,
+				"slug": "solo", "name": "Solo", "monthly_allowance": 300,
 				"daily_limit": 300, "max_active_companies": 5, "monthly_price_cents": 4990
 			},
 			"subscription": {
 				"status": "active", "paid_until": "2026-11-01",
-				"cancel_at_period_end": false, "scheduled_plan": null, "blocked": false
+				"cancel_at_period_end": false, "scheduled_plan": null, "blocked": false,
+				"stripe_portal_available": true, "stripe_subscription": true,
+				"pix_subscription": {"brCode": "000201", "paymentLinkUrl": null, "planSlug": "solo", "status": "pending"}
 			},
 			"usage": {
-				"overage_units": 0, "overage_amount_cents": 0, "hard_limit": null,
+				"avulso_balance": 7, "hard_limit": null,
 				"credits_used": 100, "credits_reserved": 0, "credits_remaining": 200,
 				"monthly_allowance": 300, "daily_usage": 12, "daily_limit": 300,
 				"active_companies": 3, "max_active_companies": 5,
@@ -121,11 +122,18 @@ func TestBillingPlanUsesSnakeCaseWireNames(t *testing.T) {
 	if call.path != "/v1/billing/plan" {
 		t.Errorf("expected path /v1/billing/plan, got %s", call.path)
 	}
-	if plan.Plan.Slug != "start" || plan.Plan.MonthlyAllowance != 300 || plan.Plan.MonthlyPriceCents != 4990 {
+	if plan.Plan.Slug != "solo" || plan.Plan.MonthlyAllowance != 300 || plan.Plan.MonthlyPriceCents != 4990 {
 		t.Errorf("expected snake_case plan fields decoded, got %+v", plan.Plan)
 	}
 	if plan.Subscription.Status != "active" || plan.Subscription.PaidUntil != "2026-11-01" {
 		t.Errorf("expected subscription decoded, got %+v", plan.Subscription)
+	}
+	if !plan.Subscription.StripePortalAvailable || !plan.Subscription.StripeSubscription ||
+		plan.Subscription.PixSubscription == nil || plan.Subscription.PixSubscription.Status != "pending" {
+		t.Errorf("expected stripe and pix subscription fields decoded, got %+v", plan.Subscription)
+	}
+	if plan.Usage.AvulsoBalance != 7 {
+		t.Errorf("expected usage.avulso_balance 7, got %d", plan.Usage.AvulsoBalance)
 	}
 	if plan.Usage.CreditsRemaining != 200 || plan.Usage.HardLimit != 0 {
 		t.Errorf("expected usage decoded (hard_limit null -> 0), got %+v", plan.Usage)

@@ -1,5 +1,7 @@
 package corvonfse
 
+import "encoding/json"
+
 // Pagination is the cursor pagination block returned by every list
 // endpoint: { limit, hasMore, nextCursor }.
 //
@@ -28,3 +30,29 @@ const (
 	EnvironmentTest Environment = "test"
 	EnvironmentLive Environment = "live"
 )
+
+// Nullable is an optional JSON field that can also be sent as an explicit
+// null. Use a nil *Nullable[T] to leave the field out of the request, Some(v)
+// to set it and Null[T]() to clear it on the server.
+type Nullable[T any] struct {
+	Value  T
+	IsNull bool
+}
+
+// Some builds a Nullable that sends v.
+func Some[T any](v T) *Nullable[T] {
+	return &Nullable[T]{Value: v}
+}
+
+// Null builds a Nullable that sends an explicit JSON null.
+func Null[T any]() *Nullable[T] {
+	return &Nullable[T]{IsNull: true}
+}
+
+// MarshalJSON encodes the null or the value.
+func (n Nullable[T]) MarshalJSON() ([]byte, error) {
+	if n.IsNull {
+		return []byte("null"), nil
+	}
+	return json.Marshal(n.Value)
+}

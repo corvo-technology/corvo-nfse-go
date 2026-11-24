@@ -254,7 +254,7 @@ func TestInvoicesSendEmailWithIdempotencyKey(t *testing.T) {
 		writeJSON(w, http.StatusAccepted, `{"data": {"emailId": "mail_1", "status": "queued"}}`)
 	}))
 
-	result, err := client.Invoices.SendEmail(context.Background(), "inv_1", "mail-1")
+	result, err := client.Invoices.SendEmail(context.Background(), "inv_1", nil, "mail-1")
 	if err != nil {
 		t.Fatalf("invoices.sendEmail: %v", err)
 	}

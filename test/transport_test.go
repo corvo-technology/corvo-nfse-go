@@ -53,7 +53,7 @@ func TestTransportSendsJSONBodyAndIdempotencyKey(t *testing.T) {
 	}))
 
 	send := true
-	invoice, err := client.Invoices.Create(context.Background(), corvonfse.InvoiceCreateParams{
+	created, err := client.Invoices.Create(context.Background(), corvonfse.InvoiceCreateParams{
 		Customer: &corvonfse.InvoiceCustomerInput{
 			Name:  "Cliente Fictício de Testes",
 			TaxID: "52998224725",
@@ -71,8 +71,8 @@ func TestTransportSendsJSONBodyAndIdempotencyKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoices.create: %v", err)
 	}
-	if invoice.ID != "inv_1" {
-		t.Errorf("expected unwrapped id inv_1, got %q", invoice.ID)
+	if created.Invoice == nil || created.Invoice.ID != "inv_1" {
+		t.Fatalf("expected unwrapped invoice inv_1, got %+v", created)
 	}
 	if call.header.Get("Content-Type") != "application/json" {
 		t.Errorf("expected Content-Type application/json, got %q", call.header.Get("Content-Type"))

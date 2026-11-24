@@ -8,6 +8,10 @@ type TaxRegime string
 const (
 	TaxRegimeMEI             TaxRegime = "MEI"
 	TaxRegimeSimplesNacional TaxRegime = "Simples Nacional"
+	// TaxRegimeLucroPresumido and TaxRegimeLucroReal are in the contract's
+	// enum, but Corvo only issues for MEI and Simples Nacional.
+	TaxRegimeLucroPresumido TaxRegime = "Lucro Presumido"
+	TaxRegimeLucroReal      TaxRegime = "Lucro Real"
 )
 
 // CompanyAddressInput is the address supplied when creating or updating a
@@ -57,6 +61,7 @@ type CompanyCreateParams struct {
 // left at their zero value are omitted from the request, leaving the
 // server-side value unchanged.
 type CompanyUpdateParams struct {
+	// The CNPJ (taxId) cannot be changed, so it is not accepted here.
 	LegalName          string    `json:"legalName,omitempty"`
 	TradeName          string    `json:"tradeName,omitempty"`
 	MunicipalReg       string    `json:"municipalReg,omitempty"`
@@ -104,4 +109,26 @@ type Company struct {
 	UpdatedAt           string    `json:"updatedAt"`
 	DeletedAt           string    `json:"deletedAt"`
 	SetupGaps           []string  `json:"setupGaps"`
+	SimplesRate         string    `json:"simplesRate"`
+	SimplesIssRate      string    `json:"simplesIssRate"`
+	// MunicipalityAgreement is what the Receita says about the municipality's
+	// adhesion to the national system.
+	MunicipalityAgreement *MunicipalityAgreement `json:"municipalityAgreement"`
+	// Warnings are registry warnings (TAX_REGIME_REGISTRY_MISMATCH,
+	// MEI_MUNICIPALITY_MISMATCH).
+	Warnings []RegistryWarning `json:"warnings"`
+}
+
+// MunicipalityAgreement is the municipality's adhesion to the national NFS-e
+// system. Status is not_checked, active, inactive, unknown or not_found.
+type MunicipalityAgreement struct {
+	AgreementType string `json:"agreementType"`
+	CheckedAt     string `json:"checkedAt"`
+	Status        string `json:"status"`
+}
+
+// RegistryWarning is a mismatch between the company and the public registry.
+type RegistryWarning struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }

@@ -4,7 +4,7 @@ package corvonfse
 // values are listed in WebhookEvents.
 type WebhookEvent string
 
-// WebhookEvents are the eleven event types accepted when creating a
+// WebhookEvents are the twelve event types accepted when creating a
 // webhook. The webhook.test event is only sent by Webhooks.Test and cannot be
 // subscribed.
 var WebhookEvents = [...]WebhookEvent{
@@ -19,6 +19,7 @@ var WebhookEvents = [...]WebhookEvent{
 	"nfse.invoice.fiscal_discrepancy",
 	"nfse.invoice.cancelled",
 	"nfse.invoice.cancellation_rejected",
+	"nfse.invoice.taker_rejected",
 }
 
 // WebhookCreateParams are the fields accepted by Webhooks.Create.
@@ -29,24 +30,29 @@ type WebhookCreateParams struct {
 
 // Webhook is a registered webhook endpoint.
 type Webhook struct {
-	ID        string         `json:"id"`
-	URL       string         `json:"url"`
-	Events    []WebhookEvent `json:"events"`
-	Active    bool           `json:"active"`
-	CreatedAt string         `json:"createdAt"`
-	UpdatedAt string         `json:"updatedAt"`
+	ID     string         `json:"id"`
+	URL    string         `json:"url"`
+	Events []WebhookEvent `json:"events"`
+	Active bool           `json:"active"`
+	// Environment is "test" or "live": a webhook created with an API key is
+	// tied to that key's environment and only receives its events.
+	Environment Environment `json:"environment"`
+	CreatedAt   string      `json:"createdAt"`
+	UpdatedAt   string      `json:"updatedAt"`
 }
 
 // WebhookWithSecret is returned by Webhooks.Create only — the signing
 // secret is shown once and cannot be retrieved again.
 type WebhookWithSecret struct {
-	ID        string         `json:"id"`
-	URL       string         `json:"url"`
-	Events    []WebhookEvent `json:"events"`
-	Active    bool           `json:"active"`
-	CreatedAt string         `json:"createdAt"`
-	UpdatedAt string         `json:"updatedAt"`
-	Secret    string         `json:"secret"`
+	ID     string         `json:"id"`
+	URL    string         `json:"url"`
+	Events []WebhookEvent `json:"events"`
+	Active bool           `json:"active"`
+	// Environment is "test" or "live".
+	Environment Environment `json:"environment"`
+	CreatedAt   string      `json:"createdAt"`
+	UpdatedAt   string      `json:"updatedAt"`
+	Secret      string      `json:"secret"`
 }
 
 // DeliveryListParams are the filters accepted by Deliveries.List and
@@ -71,7 +77,7 @@ type WebhookDelivery struct {
 	URL             string         `json:"url"`
 	Payload         map[string]any `json:"payload"`
 	StatusCode      int            `json:"statusCode"`
-	ResponseBody    any            `json:"responseBody"`
+	ResponseBody    string         `json:"responseBody"`
 	ErrorMessage    string         `json:"errorMessage"`
 	Status          string         `json:"status"`
 	DurationMS      int            `json:"durationMs"`
